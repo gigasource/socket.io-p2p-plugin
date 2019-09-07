@@ -36,9 +36,16 @@ module.exports = function p2pServerPlugin(io) {
     });
 
     //todo: handle p2p event
-    socket.on(P2P_EMIT_EVENT, function ({targetDeviceId, event, args}) {
+    socket.on(P2P_EMIT_EVENT, ({targetDeviceId, event, args}) => {
       const socketDeviceId = p2pServerManager.getClientSocketId(targetDeviceId);
       io.to(socketDeviceId).emit(event, args);
+    });
+
+    socket.on(P2P_EMIT_ACKNOWLEDGE_EVENT, ({targetDeviceId, event, args}, acknowledgeFunction) => {
+      const socketDeviceId = p2pServerManager.getClientSocketId(targetDeviceId);
+      io.to(socketDeviceId).emit(event, args);
+
+      acknowledgeFunction('Server acknowledged');
     });
   });
 }

@@ -12,21 +12,33 @@ class NewApi {
   }
 
   emit2() {
+    const [event, ...args] = arguments;
+
     // acknowledge case
     if (typeof arguments[arguments.length - 1] === 'function') {
-      this.io.emit(P2P_EMIT_ACKNOWLEDGE_EVENT, ...arguments);
-    }
+      const acknowledgeCallbackFn = args.pop(); // lastArg is acknowledge callback function
 
+      this.io.emit(P2P_EMIT_ACKNOWLEDGE_EVENT, {
+        targetDeviceId: this.targetDeviceId,
+        event,
+        args,
+      }, (acknowledgeData) => {
+        acknowledgeCallbackFn(acknowledgeData);
+      });
+    }
     // no acknowledge case
-    const [event, ...args] = arguments;
-    this.io.emit(P2P_EMIT_EVENT, {
-      deviceId: this.targetDeviceId,
-      event,
-      args,
-    });
+    else {
+      this.io.emit(P2P_EMIT_EVENT, {
+        targetDeviceId: this.targetDeviceId,
+        event,
+        args,
+      });
+    }
   }
 
-  on2() {}
+  on2() {
+
+  }
 }
 
 
@@ -43,4 +55,4 @@ module.exports = function p2pClientPlugin(io) {
       return obj[prop];
     }
   });
-}
+};
