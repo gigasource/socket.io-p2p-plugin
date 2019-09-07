@@ -2,9 +2,8 @@ const P2P_EMIT_EVENT = 'P2P_EMIT_EVENT';
 const P2P_EMIT_ACKNOWLEDGE_EVENT = 'P2P_EMIT_ACKNOWLEDGE_EVENT';
 
 class NewApi {
-  constructor(io, sourceDeviceId) {
+  constructor(io) {
     this.io = io;
-    this.sourceDeviceId = sourceDeviceId;
   }
 
   registerP2pTarget(targetDeviceId, options = {}) {
@@ -20,7 +19,6 @@ class NewApi {
       const acknowledgeCallbackFn = args.pop(); // last arg is acknowledge callback function
 
       this.io.emit(P2P_EMIT_ACKNOWLEDGE_EVENT, {
-        sourceDeviceId: this.sourceDeviceId,
         targetDeviceId: this.targetDeviceId,
         event,
         args,
@@ -29,7 +27,6 @@ class NewApi {
     // no acknowledge case
     else {
       this.io.emit(P2P_EMIT_EVENT, {
-        sourceDeviceId: this.sourceDeviceId,
         targetDeviceId: this.targetDeviceId,
         event,
         args,
@@ -48,8 +45,8 @@ class NewApi {
   }
 }
 
-module.exports = function p2pClientPlugin(io, sourceDeviceId) {
-  const newApi = new NewApi(io, sourceDeviceId);
+module.exports = function p2pClientPlugin(io) {
+  const newApi = new NewApi(io);
   return new Proxy(io, {
     get: (obj, prop) => {
 

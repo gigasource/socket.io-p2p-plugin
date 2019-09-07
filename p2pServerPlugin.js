@@ -23,7 +23,7 @@ class P2pServerManager {
 module.exports = function p2pServerPlugin(io) {
   const p2pServerManager = new P2pServerManager(io);
 
-  const emitEvent = ({sourceDeviceId, targetDeviceId, event, args}) => {
+  const emitEvent = (sourceDeviceId, {targetDeviceId, event, args}) => {
     const socketDeviceId = p2pServerManager.getClientSocketId(targetDeviceId);
     io.to(socketDeviceId).emit(event, sourceDeviceId, args);
   }
@@ -34,6 +34,7 @@ module.exports = function p2pServerPlugin(io) {
 
     //lifecycle
     socket.on('disconnect', reason => {
+      console.log('disconnect');
       p2pServerManager.removeClient(deviceId);
     });
 
@@ -43,11 +44,11 @@ module.exports = function p2pServerPlugin(io) {
 
     //todo: handle p2p event
     socket.on(P2P_EMIT_EVENT, (args) => {
-      emitEvent(args);
+      emitEvent(deviceId, args);
     });
 
     socket.on(P2P_EMIT_ACKNOWLEDGE_EVENT, (args, acknowledgeFn) => {
-      emitEvent(args);
+      emitEvent(deviceId, args);
 
       acknowledgeFn('Server acknowledged');
     });
