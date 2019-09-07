@@ -2,13 +2,14 @@ const P2P_EMIT_EVENT = 'P2P_EMIT_EVENT';
 const P2P_EMIT_ACKNOWLEDGE_EVENT = 'P2P_EMIT_ACKNOWLEDGE_EVENT';
 
 class NewApi {
-  constructor(io) {
+  constructor(io, sourceDeviceId) {
     this.io = io;
+    this.sourceDeviceId = sourceDeviceId;
   }
 
-  registerP2pTarget(deviceId, opts = {}) {
-    this.targetDeviceId = deviceId;
-    this.opts = opts;
+  registerP2pTarget(targetDeviceId, options = {}) {
+    this.targetDeviceId = targetDeviceId;
+    this.options = options;
   }
 
   emit2() {
@@ -16,19 +17,19 @@ class NewApi {
 
     // acknowledge case
     if (typeof arguments[arguments.length - 1] === 'function') {
-      const acknowledgeCallbackFn = args.pop(); // lastArg is acknowledge callback function
+      const acknowledgeCallbackFn = args.pop(); // last arg is acknowledge callback function
 
       this.io.emit(P2P_EMIT_ACKNOWLEDGE_EVENT, {
+        sourceDeviceId: this.sourceDeviceId,
         targetDeviceId: this.targetDeviceId,
         event,
         args,
-      }, (acknowledgeData) => {
-        acknowledgeCallbackFn(acknowledgeData);
-      });
+      }, acknowledgeCallbackFn);
     }
     // no acknowledge case
     else {
       this.io.emit(P2P_EMIT_EVENT, {
+        sourceDeviceId: this.sourceDeviceId,
         targetDeviceId: this.targetDeviceId,
         event,
         args,
@@ -37,13 +38,18 @@ class NewApi {
   }
 
   on2() {
+    const [event, fn] = arguments;
 
+    this.io.on(event, (sourceDeviceId, args) => {
+      // Register targetDeviceId if source device is currently idle
+      if (!this.targetDeviceId) this.targetDeviceId = sourceDeviceId;
+      fn(args);
+    });
   }
 }
 
-
-module.exports = function p2pClientPlugin(io) {
-  const newApi = new NewApi(io);
+module.exports = function p2pClientPlugin(io, sourceDeviceId) {
+  const newApi = new NewApi(io, sourceDeviceId);
   return new Proxy(io, {
     get: (obj, prop) => {
 
