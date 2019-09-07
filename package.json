@@ -1,0 +1,16 @@
+{
+  "name": "socket.io-plugin-signaling-server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "p2pClientPlugin.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "socket.io-client": "^2.2.0",
+    "socket.io": "^2.2.0"
+  }
+}
