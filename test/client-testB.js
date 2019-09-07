@@ -4,7 +4,7 @@ const socketClient = require('socket.io-client');
 const ioRaw = socketClient.connect(`http://localhost:9000?deviceId=${sourceDeviceId}`);
 const io = p2pClientPlugin(ioRaw);
 
-io.on2('testEventAcknowledge', function () {
+io.on('testEventAcknowledge', function () {
   io.emit2('testEventAcknowledge', {abc: 'test'});
 });
 

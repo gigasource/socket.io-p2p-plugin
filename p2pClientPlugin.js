@@ -1,14 +1,22 @@
 const P2P_EMIT_EVENT = 'P2P_EMIT_EVENT';
 const P2P_EMIT_ACKNOWLEDGE_EVENT = 'P2P_EMIT_ACKNOWLEDGE_EVENT';
+const P2P_REGISTER = 'P2P_REGISTER';
+const P2P_DISCONNECT = 'P2P_DISCONNECT';
 
 class NewApi {
   constructor(io) {
     this.io = io;
+
+    this.io.on(P2P_REGISTER, (sourceDeviceId) => {
+      if (!this.targetDeviceId) this.targetDeviceId = sourceDeviceId;
+    });
   }
 
   registerP2pTarget(targetDeviceId, options = {}) {
     this.targetDeviceId = targetDeviceId;
     this.options = options;
+
+    this.io.emit(P2P_REGISTER, targetDeviceId);
   }
 
   emit2() {
@@ -33,16 +41,6 @@ class NewApi {
       });
     }
   }
-
-  on2() {
-    const [event, fn] = arguments;
-
-    this.io.on(event, (sourceDeviceId, args) => {
-      // Register targetDeviceId if source device is currently idle
-      if (!this.targetDeviceId) this.targetDeviceId = sourceDeviceId;
-      fn(args);
-    });
-  }
 }
 
 module.exports = function p2pClientPlugin(io) {
@@ -53,7 +51,6 @@ module.exports = function p2pClientPlugin(io) {
       if (prop === 'registerP2pTarget') return newApi.registerP2pTarget.bind(newApi);
       if (prop === 'unregisterP2p') return newApi.registerP2pTarget.bind(newApi);
       if (prop === 'emit2' || prop === 'emitP2p') return newApi.emit2.bind(newApi);
-      if (prop === 'on2' || prop === 'onP2p') return newApi.on2.bind(newApi);
 
       return obj[prop];
     }
