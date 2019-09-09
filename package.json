@@ -2,7 +2,7 @@
   "name": "socket.io-plugin-signaling-server",
   "version": "1.0.0",
   "description": "",
-  "main": "p2pClientPlugin.js",
+  "main": "src/p2pClientPlugin.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

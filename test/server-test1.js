@@ -1,4 +1,4 @@
-const p2pServerPlugin = require('../p2pServerPlugin');
+const p2pServerPlugin = require('../src/p2pServerPlugin');
 //import http from "http";
 const http = require('http');
 const socketIO = require('socket.io');
