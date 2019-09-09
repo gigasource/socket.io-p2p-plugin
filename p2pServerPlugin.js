@@ -1,8 +1,7 @@
 const {SOCKET_EVENT} = require('./util/constants');
 
 class P2pServerManager {
-  constructor(io) {
-    this.io = io;
+  constructor() {
     this.deviceMap = {};
   }
 
@@ -20,7 +19,7 @@ class P2pServerManager {
 }
 
 module.exports = function p2pServerPlugin(io) {
-  const p2pServerManager = new P2pServerManager(io);
+  const p2pServerManager = new P2pServerManager();
 
   io.on('connect', (socket) => {
     const {deviceId} = socket.request._query;
@@ -35,12 +34,29 @@ module.exports = function p2pServerPlugin(io) {
       p2pServerManager.addClient(deviceId, socket.id);
     });
 
-    socket.on(SOCKET_EVENT.P2P_REGISTER, (targetDeviceId) => {
+    socket.on(SOCKET_EVENT.P2P_REGISTER, (targetDeviceId, clientCallbackFn) => {
       const socketDeviceId = p2pServerManager.getClientSocketId(targetDeviceId);
+
+      if (!socketDeviceId) {
+        // targetAvailable = false;
+        clientCallbackFn(false);
+        return;
+      }
+
       io.to(socketDeviceId).emit(SOCKET_EVENT.P2P_REGISTER, deviceId);
 
-      socket.once('disconnect', () => io.to(socketDeviceId).emit(SOCKET_EVENT.P2P_DISCONNECT));
-      io.sockets.connected[socketDeviceId].once('disconnect', () => socket.emit(SOCKET_EVENT.P2P_DISCONNECT));
+      io.sockets.connected[socketDeviceId].once(SOCKET_EVENT.P2P_REGISTER_SUCCESS, () => {
+        socket.once('disconnect', () => io.to(socketDeviceId).emit(SOCKET_EVENT.P2P_DISCONNECT));
+        io.sockets.connected[socketDeviceId].once('disconnect', () => socket.emit(SOCKET_EVENT.P2P_DISCONNECT));
+
+        // targetAvailable = true;
+        clientCallbackFn(true);
+      });
+
+      io.sockets.connected[socketDeviceId].once(SOCKET_EVENT.P2P_REGISTER_FAILED, () => {
+        // targetAvailable = false;
+        clientCallbackFn(false);
+      });
     });
 
     socket.on(SOCKET_EVENT.P2P_EMIT, (args) => {

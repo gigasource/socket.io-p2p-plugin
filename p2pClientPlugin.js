@@ -5,7 +5,12 @@ class NewApi {
     this.io = io;
 
     this.io.on(SOCKET_EVENT.P2P_REGISTER, (sourceDeviceId) => {
-      if (!this.targetDeviceId) this.targetDeviceId = sourceDeviceId;
+      if (!this.targetDeviceId) {
+        this.targetDeviceId = sourceDeviceId;
+        this.io.emit(SOCKET_EVENT.P2P_REGISTER_SUCCESS);
+      } else {
+        this.io.emit(SOCKET_EVENT.P2P_REGISTER_FAILED);
+      }
     });
 
     this.io.on(SOCKET_EVENT.P2P_DISCONNECT, () => {
@@ -13,11 +18,23 @@ class NewApi {
     });
   }
 
-  registerP2pTarget(targetDeviceId, options = {}) {
-    this.targetDeviceId = targetDeviceId;
-    this.options = options;
+  unregisterP2pTarget() {
+    if (this.targetDeviceId) {
+      this.io.emit('disconnect');
+    } else {
+      throw new Error('Device is not connected to any target device');
+    }
+  }
 
-    this.io.emit(SOCKET_EVENT.P2P_REGISTER, targetDeviceId);
+  registerP2pTarget(targetDeviceId, options = {}) {
+    this.io.emit(SOCKET_EVENT.P2P_REGISTER, targetDeviceId, (targetAvailable) => {
+      if (targetAvailable) {
+        this.targetDeviceId = targetDeviceId;
+        this.options = options;
+      } else {
+        throw new Error('Target device is not available for connection');
+      }
+    });
   }
 
   emit2() {
@@ -50,7 +67,7 @@ module.exports = function p2pClientPlugin(io) {
     get: (obj, prop) => {
 
       if (prop === 'registerP2pTarget') return newApi.registerP2pTarget.bind(newApi);
-      if (prop === 'unregisterP2p') return newApi.registerP2pTarget.bind(newApi);
+      if (prop === 'unregisterP2pTarget') return newApi.unregisterP2pTarget().bind(newApi);
       if (prop === 'emit2' || prop === 'emitP2p') return newApi.emit2.bind(newApi);
 
       return obj[prop];
