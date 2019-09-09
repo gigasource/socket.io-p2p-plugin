@@ -6,8 +6,6 @@ class NewApi {
 
     this.io.on(SOCKET_EVENT.P2P_REGISTER, (sourceDeviceId) => {
       if (!this.targetDeviceId) this.targetDeviceId = sourceDeviceId;
-
-      this.io.emit(SOCKET_EVENT.P2P_REGISTER_ACKNOWLEDGED, this.targetDeviceId);
     });
 
     this.io.on(SOCKET_EVENT.P2P_DISCONNECT, () => {
