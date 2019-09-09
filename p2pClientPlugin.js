@@ -21,8 +21,7 @@ class NewApi {
   unregisterP2pTarget() {
     if (this.targetDeviceId) {
       this.io.emit('disconnect');
-    } else {
-      throw new Error('Device is not connected to any target device');
+      delete this.targetDeviceId;
     }
   }
 
