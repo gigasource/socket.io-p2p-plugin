@@ -1,7 +1,4 @@
-const P2P_EMIT_EVENT = 'P2P_EMIT_EVENT';
-const P2P_EMIT_ACKNOWLEDGE_EVENT = 'P2P_EMIT_ACKNOWLEDGE_EVENT';
-const P2P_REGISTER = 'P2P_REGISTER';
-const P2P_DISCONNECT = 'P2P_DISCONNECT';
+const {SOCKET_EVENT} = require('./util/constants');
 
 class P2pServerManager {
   constructor(io) {
@@ -27,32 +24,30 @@ module.exports = function p2pServerPlugin(io) {
 
   io.on('connect', (socket) => {
     const {deviceId} = socket.request._query;
-    let targetId;
     p2pServerManager.addClient(deviceId, socket.id);
 
     //lifecycle
     socket.on('disconnect', reason => {
-      console.log('disconnect');
       p2pServerManager.removeClient(deviceId);
-      const socketDeviceId = p2pServerManager.getClientSocketId(targetId);
-      io.to(socketDeviceId).emit(P2P_DISCONNECT);
     });
 
     socket.on('reconnect', attemptNumber => {
-      console.log('reconnect');
       p2pServerManager.addClient(deviceId, socket.id);
     });
 
-    socket.on(P2P_REGISTER, (targetDeviceId) => {
+    socket.on(SOCKET_EVENT.P2P_REGISTER, (targetDeviceId) => {
       const socketDeviceId = p2pServerManager.getClientSocketId(targetDeviceId);
-      io.to(socketDeviceId).emit(P2P_REGISTER, deviceId);
+      io.to(socketDeviceId).emit(SOCKET_EVENT.P2P_REGISTER, deviceId);
+
+      socket.once('disconnect', () => io.to(socketDeviceId).emit(SOCKET_EVENT.P2P_DISCONNECT));
+      io.sockets.connected[socketDeviceId].once('disconnect', () => socket.emit(SOCKET_EVENT.P2P_DISCONNECT));
     });
 
-    socket.on(P2P_EMIT_EVENT, (args) => {
+    socket.on(SOCKET_EVENT.P2P_EMIT, (args) => {
       emitEvent(args);
     });
 
-    socket.on(P2P_EMIT_ACKNOWLEDGE_EVENT, (args, acknowledgeFn) => {
+    socket.on(SOCKET_EVENT.P2P_EMIT_ACKNOWLEDGE, (args, acknowledgeFn) => {
       emitEvent(args);
 
       acknowledgeFn('Server acknowledged');
@@ -63,4 +58,4 @@ module.exports = function p2pServerPlugin(io) {
       io.to(socketDeviceId).emit(event, args);
     };
   });
-}
+};

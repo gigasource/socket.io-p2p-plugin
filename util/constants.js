@@ -1,7 +1,9 @@
 module.exports.SOCKET_EVENT = Object.freeze({
-  REQUEST_DEVICE_INFO: 'request_device_info',
-  DEVICE_SEND_INFO: 'device_send_info',
-  ACKNOWLEDGE_DEVICE: 'ack_device',
+  P2P_EMIT: 'P2P_EMIT',
+  P2P_EMIT_ACKNOWLEDGE: 'P2P_EMIT_ACKNOWLEDGE',
+  P2P_REGISTER: 'P2P_REGISTER',
+  P2P_REGISTER_ACKNOWLEDGED: 'P2P_REGISTER_ACKNOWLEDGED',
+  P2P_DISCONNECT: 'P2P_DISCONNECT',
 });
 
 module.exports.SERVER_CONFIG = Object.freeze({

@@ -7,5 +7,8 @@ const server = http.createServer((req, res) => {
   res.end();
 }).listen(9000);
 
-const io = socketIO.listen(server);
+const io = socketIO.listen(server, {
+  pingInterval: 1000,
+  pingTimeout: 5000,
+});
 p2pServerPlugin(io);

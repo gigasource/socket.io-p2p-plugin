@@ -1,14 +1,17 @@
-const P2P_EMIT_EVENT = 'P2P_EMIT_EVENT';
-const P2P_EMIT_ACKNOWLEDGE_EVENT = 'P2P_EMIT_ACKNOWLEDGE_EVENT';
-const P2P_REGISTER = 'P2P_REGISTER';
-const P2P_DISCONNECT = 'P2P_DISCONNECT';
+const {SOCKET_EVENT} = require('./util/constants');
 
 class NewApi {
   constructor(io) {
     this.io = io;
 
-    this.io.on(P2P_REGISTER, (sourceDeviceId) => {
+    this.io.on(SOCKET_EVENT.P2P_REGISTER, (sourceDeviceId) => {
       if (!this.targetDeviceId) this.targetDeviceId = sourceDeviceId;
+
+      this.io.emit(SOCKET_EVENT.P2P_REGISTER_ACKNOWLEDGED, this.targetDeviceId);
+    });
+
+    this.io.on(SOCKET_EVENT.P2P_DISCONNECT, () => {
+      delete this.targetDeviceId;
     });
   }
 
@@ -16,7 +19,7 @@ class NewApi {
     this.targetDeviceId = targetDeviceId;
     this.options = options;
 
-    this.io.emit(P2P_REGISTER, targetDeviceId);
+    this.io.emit(SOCKET_EVENT.P2P_REGISTER, targetDeviceId);
   }
 
   emit2() {
@@ -26,7 +29,7 @@ class NewApi {
     if (typeof arguments[arguments.length - 1] === 'function') {
       const acknowledgeCallbackFn = args.pop(); // last arg is acknowledge callback function
 
-      this.io.emit(P2P_EMIT_ACKNOWLEDGE_EVENT, {
+      this.io.emit(SOCKET_EVENT.P2P_EMIT_ACKNOWLEDGE, {
         targetDeviceId: this.targetDeviceId,
         event,
         args,
@@ -34,7 +37,7 @@ class NewApi {
     }
     // no acknowledge case
     else {
-      this.io.emit(P2P_EMIT_EVENT, {
+      this.io.emit(SOCKET_EVENT.P2P_EMIT, {
         targetDeviceId: this.targetDeviceId,
         event,
         args,
