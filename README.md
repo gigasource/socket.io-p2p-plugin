@@ -20,8 +20,8 @@ Refer to file **test/server-test1.js** for example of usage.
 
 # 2. P2P Client Plugin
 This component adds some custom functions on top of [socket.io-client](https://www.npmjs.com/package/socket.io-client) for:
-- Register client device with the server
-- Store target deviceId for pairing connection
+- Registering client device with the server
+- Storing target deviceId for pairing connection
 - Registering/unregistering pairing connection between 2 client devices
 - Communicating with Socket.IO server with above plugin using **P2P_EMIT** and **P2P_EMIT_ACKNOWLEDGE** events
 
