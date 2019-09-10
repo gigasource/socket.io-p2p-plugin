@@ -2,19 +2,25 @@ const {SOCKET_EVENT} = require('./util/constants');
 
 class P2pServerManager {
   constructor() {
-    this.deviceMap = {};
+    this.clientMap = {};
   }
 
   addClient(clientId, clientSocketId) {
-    this.deviceMap[clientId] = clientSocketId;
+    if (clientId) {
+      this.clientMap[clientId] = clientSocketId;
+    }
   }
 
   removeClient(clientId) {
-    delete this.deviceMap[clientId];
+    delete this.clientMap[clientId];
   }
 
   getClientSocketId(clientId) {
-    return this.deviceMap[clientId];
+    return this.clientMap[clientId];
+  }
+
+  getAllClientId() {
+    return Object.keys(this.clientMap);
   }
 }
 
@@ -22,54 +28,60 @@ module.exports = function p2pServerPlugin(io) {
   const p2pServerManager = new P2pServerManager();
 
   io.on('connect', (socket) => {
-    const {deviceId} = socket.request._query;
-    p2pServerManager.addClient(deviceId, socket.id);
+    const {clientId} = socket.request._query;
+    p2pServerManager.addClient(clientId, socket.id);
 
     //lifecycle
     socket.on('disconnect', reason => {
-      p2pServerManager.removeClient(deviceId);
+      p2pServerManager.removeClient(clientId);
     });
 
     socket.on('reconnect', attemptNumber => {
-      p2pServerManager.addClient(deviceId, socket.id);
+      p2pServerManager.addClient(clientId, socket.id);
     });
 
-    socket.on(SOCKET_EVENT.P2P_REGISTER, (targetDeviceId, clientCallbackFn) => {
-      const targetDeviceSocketId = p2pServerManager.getClientSocketId(targetDeviceId);
+    socket.on(SOCKET_EVENT.P2P_REGISTER, (targetClientId, clientCallbackFn) => {
+      const targetClientSocketId = p2pServerManager.getClientSocketId(targetClientId);
+      const targetClientSocket = io.sockets.connected[targetClientSocketId];
 
-      if (!targetDeviceSocketId) {
-        // targetAvailable = false; (device is not currently online)
+      if (!targetClientSocketId) {
+        // targetAvailable = false; (client is not currently online)
         clientCallbackFn(false);
         return;
       }
 
-      io.to(targetDeviceSocketId).emit(SOCKET_EVENT.P2P_REGISTER, deviceId);
-
-      const targetDeviceSocket = io.sockets.connected[targetDeviceSocketId];
-      targetDeviceSocket.once(SOCKET_EVENT.P2P_REGISTER_SUCCESS, () => {
-        socket.once('disconnect', () => io.to(targetDeviceSocketId).emit(SOCKET_EVENT.P2P_DISCONNECT));
-        targetDeviceSocket.once('disconnect', () => socket.emit(SOCKET_EVENT.P2P_DISCONNECT));
+      targetClientSocket.once(SOCKET_EVENT.P2P_REGISTER_SUCCESS, () => {
+        socket.once('disconnect', () => targetClientSocket.emit(SOCKET_EVENT.P2P_DISCONNECT));
+        targetClientSocket.once('disconnect', () => socket.emit(SOCKET_EVENT.P2P_DISCONNECT));
 
         // targetAvailable = true; (successful connection)
         clientCallbackFn(true);
       });
 
-      targetDeviceSocket.once(SOCKET_EVENT.P2P_REGISTER_FAILED, () => {
-        // targetAvailable = false; (target device declined the connection)
+      targetClientSocket.once(SOCKET_EVENT.P2P_REGISTER_FAILED, () => {
+        // targetAvailable = false; (target client declined the connection)
         clientCallbackFn(false);
       });
+
+      targetClientSocket.emit(SOCKET_EVENT.P2P_REGISTER, clientId);
     });
 
-    socket.on(SOCKET_EVENT.P2P_EMIT, ({targetDeviceId, event, args}) => {
-      const targetDeviceSocketId = p2pServerManager.getClientSocketId(targetDeviceId);
-      io.to(targetDeviceSocketId).emit(event, ...args);
+    socket.on(SOCKET_EVENT.P2P_EMIT, ({targetClientId, event, args}) => {
+      const targetClientSocketId = p2pServerManager.getClientSocketId(targetClientId);
+      const targetClientSocket = io.sockets.connected[targetClientSocketId];
+
+      targetClientSocket.emit(event, ...args);
     });
 
-    socket.on(SOCKET_EVENT.P2P_EMIT_ACKNOWLEDGE, ({targetDeviceId, event, args}, acknowledgeFn) => {
-      const targetDeviceSocketId = p2pServerManager.getClientSocketId(targetDeviceId);
-      const targetDeviceSocket = io.sockets.connected[targetDeviceSocketId];
+    socket.on(SOCKET_EVENT.P2P_EMIT_ACKNOWLEDGE, ({targetClientId, event, args}, acknowledgeFn) => {
+      const targetClientSocketId = p2pServerManager.getClientSocketId(targetClientId);
+      const targetClientSocket = io.sockets.connected[targetClientSocketId];
 
-      targetDeviceSocket.emit(event, ...args, acknowledgeFn);
+      targetClientSocket.emit(event, ...args, acknowledgeFn);
+    });
+
+    socket.on(SOCKET_EVENT.LIST_CLIENTS, (clientCallbackFn) => {
+      clientCallbackFn(p2pServerManager.getAllClientId());
     });
   });
 };

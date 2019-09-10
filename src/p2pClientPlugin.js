@@ -4,9 +4,9 @@ class NewApi {
   constructor(io) {
     this.io = io;
 
-    this.io.on(SOCKET_EVENT.P2P_REGISTER, (sourceDeviceId) => {
-      if (!this.targetDeviceId) {
-        this.targetDeviceId = sourceDeviceId;
+    this.io.on(SOCKET_EVENT.P2P_REGISTER, (sourceClientId) => {
+      if (!this.targetClientId) {
+        this.targetClientId = sourceClientId;
         this.io.emit(SOCKET_EVENT.P2P_REGISTER_SUCCESS);
       } else {
         this.io.emit(SOCKET_EVENT.P2P_REGISTER_FAILED);
@@ -14,30 +14,30 @@ class NewApi {
     });
 
     this.io.on(SOCKET_EVENT.P2P_DISCONNECT, () => {
-      delete this.targetDeviceId;
+      delete this.targetClientId;
     });
   }
 
   unregisterP2pTarget() {
-    if (this.targetDeviceId) {
+    if (this.targetClientId) {
       this.io.emit('disconnect');
-      delete this.targetDeviceId;
+      delete this.targetClientId;
     }
   }
 
   /**
-   * @param targetDeviceId Id of the device you want to connect to
+   * @param targetClientId Id of the client you want to connect to
    * @param options Not yet used
    * @param successCallbackFn Callback function to be called if the connection is established successfully, otherwise throw an error
    */
-  registerP2pTarget(targetDeviceId, options = {}, successCallbackFn) {
-    this.io.emit(SOCKET_EVENT.P2P_REGISTER, targetDeviceId, (targetAvailable) => {
+  registerP2pTarget(targetClientId, options = {}, successCallbackFn) {
+    this.io.emit(SOCKET_EVENT.P2P_REGISTER, targetClientId, (targetAvailable) => {
       if (targetAvailable) {
-        this.targetDeviceId = targetDeviceId;
+        this.targetClientId = targetClientId;
         this.options = options;
         successCallbackFn();
       } else {
-        throw new Error('Target device is not available for connection');
+        throw new Error('Target client is not available for connection');
       }
     });
   }
@@ -50,7 +50,7 @@ class NewApi {
       const acknowledgeCallbackFn = args.pop(); // last arg is acknowledge callback function
 
       this.io.emit(SOCKET_EVENT.P2P_EMIT_ACKNOWLEDGE, {
-        targetDeviceId: this.targetDeviceId,
+        targetClientId: this.targetClientId,
         event,
         args,
       }, acknowledgeCallbackFn);
@@ -58,11 +58,17 @@ class NewApi {
     // no acknowledge case
     else {
       this.io.emit(SOCKET_EVENT.P2P_EMIT, {
-        targetDeviceId: this.targetDeviceId,
+        targetClientId: this.targetClientId,
         event,
         args,
       });
     }
+  }
+
+  getClientList(callbackFn) {
+    this.io.emit(SOCKET_EVENT.LIST_CLIENTS, (clientList) => {
+      callbackFn(clientList);
+    });
   }
 }
 
@@ -74,6 +80,8 @@ module.exports = function p2pClientPlugin(io) {
       if (prop === 'registerP2pTarget') return newApi.registerP2pTarget.bind(newApi);
       if (prop === 'unregisterP2pTarget') return newApi.unregisterP2pTarget().bind(newApi);
       if (prop === 'emit2' || prop === 'emitP2p') return newApi.emit2.bind(newApi);
+      if (prop === 'getClientList') return newApi.getClientList.bind(newApi);
+      if (prop === 'createDeviceListListener') return newApi.createDeviceListListener.bind(newApi);
 
       return obj[prop];
     }
