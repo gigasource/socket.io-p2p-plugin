@@ -7,7 +7,3 @@ module.exports.SOCKET_EVENT = Object.freeze({
   P2P_UNREGISTER: 'P2P_UNREGISTER',
   P2P_DISCONNECT: 'P2P_DISCONNECT',
 });
-
-module.exports.SERVER_CONFIG = Object.freeze({
-  PORT: 8889,
-});
