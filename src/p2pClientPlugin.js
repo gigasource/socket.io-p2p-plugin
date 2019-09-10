@@ -25,11 +25,17 @@ class NewApi {
     }
   }
 
-  registerP2pTarget(targetDeviceId, options = {}) {
+  /**
+   * @param targetDeviceId Id of the device you want to connect to
+   * @param options Not yet used
+   * @param successCallbackFn Callback function to be called if the connection is established successfully, otherwise throw an error
+   */
+  registerP2pTarget(targetDeviceId, options = {}, successCallbackFn) {
     this.io.emit(SOCKET_EVENT.P2P_REGISTER, targetDeviceId, (targetAvailable) => {
       if (targetAvailable) {
         this.targetDeviceId = targetDeviceId;
         this.options = options;
+        successCallbackFn();
       } else {
         throw new Error('Target device is not available for connection');
       }

@@ -35,26 +35,27 @@ module.exports = function p2pServerPlugin(io) {
     });
 
     socket.on(SOCKET_EVENT.P2P_REGISTER, (targetDeviceId, clientCallbackFn) => {
-      const socketDeviceId = p2pServerManager.getClientSocketId(targetDeviceId);
+      const targetDeviceSocketId = p2pServerManager.getClientSocketId(targetDeviceId);
 
-      if (!socketDeviceId) {
-        // targetAvailable = false;
+      if (!targetDeviceSocketId) {
+        // targetAvailable = false; (device is not currently online)
         clientCallbackFn(false);
         return;
       }
 
-      io.to(socketDeviceId).emit(SOCKET_EVENT.P2P_REGISTER, deviceId);
+      io.to(targetDeviceSocketId).emit(SOCKET_EVENT.P2P_REGISTER, deviceId);
 
-      io.sockets.connected[socketDeviceId].once(SOCKET_EVENT.P2P_REGISTER_SUCCESS, () => {
-        socket.once('disconnect', () => io.to(socketDeviceId).emit(SOCKET_EVENT.P2P_DISCONNECT));
-        io.sockets.connected[socketDeviceId].once('disconnect', () => socket.emit(SOCKET_EVENT.P2P_DISCONNECT));
+      const targetDeviceSocket = io.sockets.connected[targetDeviceSocketId];
+      targetDeviceSocket.once(SOCKET_EVENT.P2P_REGISTER_SUCCESS, () => {
+        socket.once('disconnect', () => io.to(targetDeviceSocketId).emit(SOCKET_EVENT.P2P_DISCONNECT));
+        targetDeviceSocket.once('disconnect', () => socket.emit(SOCKET_EVENT.P2P_DISCONNECT));
 
-        // targetAvailable = true;
+        // targetAvailable = true; (successful connection)
         clientCallbackFn(true);
       });
 
-      io.sockets.connected[socketDeviceId].once(SOCKET_EVENT.P2P_REGISTER_FAILED, () => {
-        // targetAvailable = false;
+      targetDeviceSocket.once(SOCKET_EVENT.P2P_REGISTER_FAILED, () => {
+        // targetAvailable = false; (target device declined the connection)
         clientCallbackFn(false);
       });
     });

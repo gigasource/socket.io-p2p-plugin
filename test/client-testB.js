@@ -7,4 +7,3 @@ const io = p2pClientPlugin(ioRaw);
 io.on('testAck', function () {
   io.emit2('testAckFromTarget', {abc: 'test'});
 });
-
