@@ -6,9 +6,9 @@ const io = p2pClientPlugin(ioRaw);
 
 try {
   io.registerP2pTarget('B', {}, () => {
-    // io.emit2('testEvent', {a: 1}, 'b', 2, {c: 3});
+    io.emit2('testNoAck', {a: 'testNoAck'}, 'b', 2, {c: 3});
 
-    io.emit2('testAck', {a: 1}, 'b', 2, {c: 3}, function (result) {
+    io.emit2('testAck', {a: 'testAck'}, 'b', 2, {c: 3}, function (result) {
       console.log(result);
     });
 
@@ -20,7 +20,3 @@ try {
   // handle error if connection can't be made (device is busy, device is offline, ...)
   console.error(e);
 }
-
-io.on('testAckFromTarget', function () {
-  console.log(arguments);
-});
