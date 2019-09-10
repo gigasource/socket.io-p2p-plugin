@@ -62,14 +62,14 @@ module.exports = function p2pServerPlugin(io) {
 
     socket.on(SOCKET_EVENT.P2P_EMIT, ({targetDeviceId, event, args}) => {
       const targetDeviceSocketId = p2pServerManager.getClientSocketId(targetDeviceId);
-      io.to(targetDeviceSocketId).emit(event, args);
+      io.to(targetDeviceSocketId).emit(event, ...args);
     });
 
     socket.on(SOCKET_EVENT.P2P_EMIT_ACKNOWLEDGE, ({targetDeviceId, event, args}, acknowledgeFn) => {
       const targetDeviceSocketId = p2pServerManager.getClientSocketId(targetDeviceId);
       const targetDeviceSocket = io.sockets.connected[targetDeviceSocketId];
 
-      targetDeviceSocket.emit(event, args, acknowledgeFn);
+      targetDeviceSocket.emit(event, ...args, acknowledgeFn);
     });
   });
 };
