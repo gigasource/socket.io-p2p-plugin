@@ -28,17 +28,19 @@ class NewApi {
   /**
    * @param targetClientId Id of the client you want to connect to
    * @param options Not yet used
-   * @param successCallbackFn Callback function to be called if the connection is established successfully, otherwise throw an error
+   * @returns true if connect successfully, false otherwise
    */
-  registerP2pTarget(targetClientId, options = {}, successCallbackFn) {
-    this.io.emit(SOCKET_EVENT.P2P_REGISTER, targetClientId, (targetAvailable) => {
-      if (targetAvailable) {
-        this.targetClientId = targetClientId;
-        this.options = options;
-        successCallbackFn();
-      } else {
-        throw new Error('Target client is not available for connection');
-      }
+  registerP2pTarget(targetClientId, options = {}) {
+    return new Promise(resolve => {
+      this.io.emit(SOCKET_EVENT.P2P_REGISTER, targetClientId, (targetAvailable) => {
+        if (targetAvailable) {
+          this.targetClientId = targetClientId;
+          this.options = options;
+          resolve(true);
+        } else {
+          resolve(false);
+        }
+      });
     });
   }
 
@@ -65,9 +67,11 @@ class NewApi {
     }
   }
 
-  getClientList(callbackFn) {
-    this.io.emit(SOCKET_EVENT.LIST_CLIENTS, (clientList) => {
-      callbackFn(clientList);
+  getClientList() {
+    return new Promise(resolve => {
+      this.io.emit(SOCKET_EVENT.LIST_CLIENTS, (clientList) => {
+        resolve(clientList);
+      });
     });
   }
 }

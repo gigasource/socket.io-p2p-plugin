@@ -12,3 +12,12 @@ io.on('testAck', (arg1, arg2, arg3, arg4, ackFn) => {
 io.on('testNoAck', (arg1, arg2, arg3, arg4) => {
   console.log(arg1);
 })
+
+io.on('testNoAckFromJava', (arg1, arg2, arg3) => {
+  console.log(arg1 + arg2 + arg3);
+})
+
+io.on('testAckFromJava', (arg1, ackFn) => {
+  console.log(arg1);
+  ackFn(`Data returned from B: ${JSON.stringify(arg1)}`);
+});
