@@ -1,5 +1,5 @@
 {
-  "name": "socket.io-plugin-signaling-server",
+  "name": "@gigasource/socket.io-p2p-plugin",
   "version": "1.1.2",
   "description": "",
   "main": "src/p2pClientPlugin.js",
