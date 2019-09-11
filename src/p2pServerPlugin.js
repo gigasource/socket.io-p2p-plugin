@@ -70,6 +70,7 @@ module.exports = function p2pServerPlugin(io) {
       const targetClientSocketId = p2pServerManager.getClientSocketId(targetClientId);
       const targetClientSocket = io.sockets.connected[targetClientSocketId];
 
+      console.log(socket.id, SOCKET_EVENT.P2P_EMIT, 'target id: ', targetClientId, 'event:', event, '...args:', ...args)
       targetClientSocket.emit(event, ...args);
     });
 
