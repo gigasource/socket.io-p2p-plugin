@@ -13,13 +13,18 @@ class NewApi {
       }
     });
 
-    this.io.on(SOCKET_EVENT.P2P_DISCONNECT, () => {
-      delete this.targetClientId;
+    this.io.on(SOCKET_EVENT.P2P_DISCONNECT, (sourceClientId) => {
+      console.log(`receive p2p disconnect from ${sourceClientId}`);
+      if (sourceClientId === this.targetClientId) delete this.targetClientId;
     });
 
     this.io.on(SOCKET_EVENT.P2P_UNREGISTER, () => {
       delete this.targetClientId;
     });
+
+    this.io.on(SOCKET_EVENT.SERVER_ERROR, (err) => {
+      console.error(`Error emitted from server: ${err}`);
+    })
   }
 
   unregisterP2pTarget() {
@@ -32,20 +37,34 @@ class NewApi {
   /**
    * @param targetClientId Id of the client you want to connect to
    * @param options Not yet used
-   * @returns true if connect successfully, false otherwise
+   * @param successCallbackFn
+   * @param failureCallbackFn
+   * @returns 1. No callbacks: true if connect successfully, false otherwise; 2. With callbacks: doesn't return anything
    */
-  registerP2pTarget(targetClientId, options = {}) {
-    return new Promise(resolve => {
+  registerP2pTarget(targetClientId, options = {}, successCallbackFn, failureCallbackFn) {
+    if (successCallbackFn || failureCallbackFn) {
       this.io.emit(SOCKET_EVENT.P2P_REGISTER, targetClientId, (targetAvailable) => {
         if (targetAvailable) {
           this.targetClientId = targetClientId;
           this.options = options;
-          resolve(true);
+          successCallbackFn();
         } else {
-          resolve(false);
+          failureCallbackFn();
         }
       });
-    });
+    } else {
+      return new Promise(resolve => {
+        this.io.emit(SOCKET_EVENT.P2P_REGISTER, targetClientId, (targetAvailable) => {
+          if (targetAvailable) {
+            this.targetClientId = targetClientId;
+            this.options = options;
+            resolve(true);
+          } else {
+            resolve(false);
+          }
+        });
+      });
+    }
   }
 
   emit2() {
@@ -56,7 +75,6 @@ class NewApi {
       const acknowledgeCallbackFn = args.pop(); // last arg is acknowledge callback function
 
       this.io.emit(SOCKET_EVENT.P2P_EMIT_ACKNOWLEDGE, {
-        targetClientId: this.targetClientId,
         event,
         args,
       }, acknowledgeCallbackFn);
@@ -64,19 +82,24 @@ class NewApi {
     // no acknowledge case
     else {
       this.io.emit(SOCKET_EVENT.P2P_EMIT, {
-        targetClientId: this.targetClientId,
         event,
         args,
       });
     }
   }
 
-  getClientList() {
-    return new Promise(resolve => {
+  getClientList(successCallbackFn) {
+    if (successCallbackFn) {
       this.io.emit(SOCKET_EVENT.LIST_CLIENTS, (clientList) => {
-        resolve(clientList);
+        successCallbackFn(clientList);
       });
-    });
+    } else {
+      return new Promise(resolve => {
+        this.io.emit(SOCKET_EVENT.LIST_CLIENTS, (clientList) => {
+          resolve(clientList);
+        });
+      });
+    }
   }
 }
 

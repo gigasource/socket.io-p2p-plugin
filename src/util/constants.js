@@ -7,6 +7,7 @@ module.exports.SOCKET_EVENT = Object.freeze({
   P2P_REGISTER_FAILED: 'P2P_REGISTER_FAILED',
   P2P_DISCONNECT: 'P2P_DISCONNECT',
   LIST_CLIENTS: 'LIST_CLIENTS',
+  SERVER_ERROR: 'SERVER_ERROR',
 });
 
 module.exports.SERVER_CONFIG = Object.freeze({

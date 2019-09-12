@@ -16,13 +16,13 @@ let server;
 let io;
 
 const startServer = function () {
-  server = http.createServer((req, res) => res.end()).listen(9000);
+  server = http.createServer((req, res) => res.end()).listen(SERVER_CONFIG.PORT);
   io = socketIO.listen(server);
   p2pServerPlugin(io);
 }
 
 const startClient = function (client, clientId) {
-  const io = socketClient.connect(`http://${SERVER_CONFIG.IP_ADDRESS}:${SERVER_CONFIG.PORT}?clientId=${clientId}`);
+  const io = socketClient.connect(`http://localhost:${SERVER_CONFIG.PORT}?clientId=${clientId}`);
   return p2pClientPlugin(io);
 }
 

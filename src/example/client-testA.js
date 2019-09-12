@@ -15,7 +15,7 @@ const test = async () => {
     io.emit2('testAck', {a: 'testAck'}, 'b', 2, {c: 3}, function (result) {
       console.log(typeof result);
     });
-ioRaw.emit('test');
+
     setTimeout(() => {
       io.unregisterP2pTarget();
       console.log('unregister');

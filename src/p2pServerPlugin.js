@@ -1,4 +1,5 @@
 const {SOCKET_EVENT} = require('./util/constants');
+const findKey = require('lodash/findKey');
 
 class P2pServerManager {
   constructor() {
@@ -22,6 +23,10 @@ class P2pServerManager {
   getAllClientId() {
     return Object.keys(this.clientMap);
   }
+
+  findClientIdBySocketId(socketId) {
+    return findKey(this.clientMap, (v) => v === socketId);
+  }
 }
 
 module.exports = function p2pServerPlugin(io) {
@@ -31,8 +36,27 @@ module.exports = function p2pServerPlugin(io) {
     const {clientId} = socket.request._query;
     p2pServerManager.addClient(clientId, socket.id);
 
-    //lifecycle
+    const throwError = (err) => {
+      console.error(err);
+      socket.emit(SOCKET_EVENT.SERVER_ERROR, err.toString());
+      console.log(socket.id + ' ' + p2pServerManager.findClientIdBySocketId(socket.id));
+    }
+
+    const findTargetClientSocket = (targetClientId) => {
+      const targetClientSocket = io.sockets.connected[p2pServerManager.getClientSocketId(targetClientId)];
+      if (!targetClientSocket)
+        throwError(new Error(`Could not find target client ${targetClientId} socket, client is not registered to the server`));
+      return targetClientSocket;
+    }
+
+    const removePostRegisterListeners = () => {
+      socket.removeAllListeners(SOCKET_EVENT.P2P_UNREGISTER);
+      socket.removeAllListeners(SOCKET_EVENT.P2P_EMIT);
+      socket.removeAllListeners(SOCKET_EVENT.P2P_EMIT_ACKNOWLEDGE);
+    }
+
     socket.on('disconnect', reason => {
+      removePostRegisterListeners();
       p2pServerManager.removeClient(clientId);
     });
 
@@ -40,53 +64,74 @@ module.exports = function p2pServerPlugin(io) {
       p2pServerManager.addClient(clientId, socket.id);
     });
 
-    socket.on(SOCKET_EVENT.P2P_REGISTER, (targetClientId, clientCallbackFn) => {
-      const targetClientSocketId = p2pServerManager.getClientSocketId(targetClientId);
-      const targetClientSocket = io.sockets.connected[targetClientSocketId];
+    socket.on(SOCKET_EVENT.P2P_REGISTER, (targetClientId, p2pRegisterCallbackFn) => {
+      let targetClientSocket = findTargetClientSocket(targetClientId);
 
-      if (!targetClientSocketId) {
-        // targetAvailable = false; (client is not currently online)
-        clientCallbackFn(false);
+      if (!targetClientSocket) {
+        p2pRegisterCallbackFn(false);
         return;
       }
 
-      socket.once(SOCKET_EVENT.P2P_UNREGISTER, () => {
-        targetClientSocket.emit(SOCKET_EVENT.P2P_UNREGISTER);
-      });
-
       targetClientSocket.once(SOCKET_EVENT.P2P_REGISTER_SUCCESS, () => {
-        socket.once('disconnect', () => targetClientSocket.emit(SOCKET_EVENT.P2P_DISCONNECT));
-        targetClientSocket.once('disconnect', () => socket.emit(SOCKET_EVENT.P2P_DISCONNECT));
+        const sourceClientId = p2pServerManager.findClientIdBySocketId(socket.id);
 
-        // targetAvailable = true; (successful connection)
-        clientCallbackFn(true);
+        targetClientSocket.removeAllListeners(SOCKET_EVENT.P2P_REGISTER_FAILED);
+
+        targetClientSocket.once('disconnect', () => {
+          socket.emit(SOCKET_EVENT.P2P_DISCONNECT, targetClientId);
+          removePostRegisterListeners();
+        });
+
+        socket.once('disconnect', () => {
+          targetClientSocket.emit(SOCKET_EVENT.P2P_DISCONNECT, sourceClientId);
+          removePostRegisterListeners();
+        });
+
+        socket.once(SOCKET_EVENT.P2P_UNREGISTER, () => {
+          targetClientSocket = findTargetClientSocket(targetClientId);
+          if (targetClientSocket) targetClientSocket.emit(SOCKET_EVENT.P2P_UNREGISTER);
+          removePostRegisterListeners();
+        });
+
+        socket.on(SOCKET_EVENT.P2P_EMIT, ({event, args}) => {
+          targetClientSocket = findTargetClientSocket(targetClientId);
+          if (targetClientSocket) targetClientSocket.emit(event, ...args);
+        });
+
+        socket.on(SOCKET_EVENT.P2P_EMIT_ACKNOWLEDGE, ({event, args}, acknowledgeFn) => {
+          targetClientSocket = findTargetClientSocket(targetClientId);
+          if (targetClientSocket) targetClientSocket.emit(event, ...args, acknowledgeFn);
+        });
+
+        // successful connection
+        p2pRegisterCallbackFn(true);
       });
 
       targetClientSocket.once(SOCKET_EVENT.P2P_REGISTER_FAILED, () => {
-        // targetAvailable = false; (target client declined the connection)
-        clientCallbackFn(false);
+        targetClientSocket.removeAllListeners(SOCKET_EVENT.P2P_REGISTER_SUCCESS);
+        throwError(new Error(`Target client ${targetClientId} refuses the connection`));
+        p2pRegisterCallbackFn(false);
       });
 
       targetClientSocket.emit(SOCKET_EVENT.P2P_REGISTER, clientId);
     });
 
-    socket.on(SOCKET_EVENT.P2P_EMIT, ({targetClientId, event, args}) => {
-      const targetClientSocketId = p2pServerManager.getClientSocketId(targetClientId);
-      const targetClientSocket = io.sockets.connected[targetClientSocketId];
-
-      console.log(socket.id, SOCKET_EVENT.P2P_EMIT, 'target id: ', targetClientId, 'event:', event, '...args:', ...args)
-      targetClientSocket.emit(event, ...args);
-    });
-
-    socket.on(SOCKET_EVENT.P2P_EMIT_ACKNOWLEDGE, ({targetClientId, event, args}, acknowledgeFn) => {
-      const targetClientSocketId = p2pServerManager.getClientSocketId(targetClientId);
-      const targetClientSocket = io.sockets.connected[targetClientSocketId];
-
-      targetClientSocket.emit(event, ...args, acknowledgeFn);
-    });
-
     socket.on(SOCKET_EVENT.LIST_CLIENTS, (clientCallbackFn) => {
       clientCallbackFn(p2pServerManager.getAllClientId());
     });
+  });
+
+  return new Proxy(p2pServerManager, {
+    get: (obj, prop) => {
+
+      // if (prop === 'startServer')
+      // if (prop === 'stopServer')
+
+      if (prop === 'getClientSocketId') return p2pServerManager.getClientSocketId.bind(p2pServerManager);
+      if (prop === 'getAllClientId') return p2pServerManager.getAllClientId.bind(p2pServerManager);
+      if (prop === 'findClientIdBySocketId') return p2pServerManager.findClientIdBySocketId.bind(p2pServerManager);
+
+      return obj[prop];
+    }
   });
 };
