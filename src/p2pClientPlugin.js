@@ -16,11 +16,15 @@ class NewApi {
     this.io.on(SOCKET_EVENT.P2P_DISCONNECT, () => {
       delete this.targetClientId;
     });
+
+    this.io.on(SOCKET_EVENT.P2P_UNREGISTER, () => {
+      delete this.targetClientId;
+    });
   }
 
   unregisterP2pTarget() {
     if (this.targetClientId) {
-      this.io.emit('disconnect');
+      this.io.emit(SOCKET_EVENT.P2P_UNREGISTER);
       delete this.targetClientId;
     }
   }
@@ -82,10 +86,9 @@ module.exports = function p2pClientPlugin(io) {
     get: (obj, prop) => {
 
       if (prop === 'registerP2pTarget') return newApi.registerP2pTarget.bind(newApi);
-      if (prop === 'unregisterP2pTarget') return newApi.unregisterP2pTarget().bind(newApi);
+      if (prop === 'unregisterP2pTarget') return newApi.unregisterP2pTarget.bind(newApi);
       if (prop === 'emit2' || prop === 'emitP2p') return newApi.emit2.bind(newApi);
       if (prop === 'getClientList') return newApi.getClientList.bind(newApi);
-      if (prop === 'createDeviceListListener') return newApi.createDeviceListListener.bind(newApi);
 
       return obj[prop];
     }

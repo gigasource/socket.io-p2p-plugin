@@ -50,6 +50,10 @@ module.exports = function p2pServerPlugin(io) {
         return;
       }
 
+      socket.once(SOCKET_EVENT.P2P_UNREGISTER, () => {
+        targetClientSocket.emit(SOCKET_EVENT.P2P_UNREGISTER);
+      });
+
       targetClientSocket.once(SOCKET_EVENT.P2P_REGISTER_SUCCESS, () => {
         socket.once('disconnect', () => targetClientSocket.emit(SOCKET_EVENT.P2P_DISCONNECT));
         targetClientSocket.once('disconnect', () => socket.emit(SOCKET_EVENT.P2P_DISCONNECT));
