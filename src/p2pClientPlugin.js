@@ -1,8 +1,9 @@
 const {SOCKET_EVENT} = require('./util/constants');
 
 class NewApi {
-  constructor(io) {
+  constructor(io, clientId) {
     this.io = io;
+    this.clientId = clientId;
 
     this.io.on(SOCKET_EVENT.P2P_REGISTER, (sourceClientId) => {
       if (!this.targetClientId) {
@@ -13,12 +14,13 @@ class NewApi {
       }
     });
 
-    this.io.on(SOCKET_EVENT.P2P_DISCONNECT, () =>
-      delete this.targetClientId
-    );
+    this.io.on(SOCKET_EVENT.P2P_DISCONNECT, () => {
+      if (this.targetClientId) delete this.targetClientId;
+    });
 
-    this.io.on(SOCKET_EVENT.P2P_UNREGISTER, () => {
-      delete this.targetClientId;
+    this.io.on(SOCKET_EVENT.P2P_UNREGISTER, (doneCallback) => {
+      if (this.targetClientId) delete this.targetClientId;
+      doneCallback();
     });
 
     this.io.on(SOCKET_EVENT.SERVER_ERROR, (err) => {
@@ -26,11 +28,25 @@ class NewApi {
     })
   }
 
-  unregisterP2pTarget() {
-    if (this.targetClientId) {
-      this.io.emit(SOCKET_EVENT.P2P_UNREGISTER);
-      delete this.targetClientId;
+  unregisterP2pTarget(doneCallback) {
+    if (doneCallback) {
+      if (this.targetClientId) {
+        this.io.emit(SOCKET_EVENT.P2P_UNREGISTER, () => {
+          doneCallback();
+        });
+        delete this.targetClientId;
+      }
+    } else {
+      return new Promise(resolve => {
+        if (this.targetClientId) {
+          this.io.emit(SOCKET_EVENT.P2P_UNREGISTER, () => {
+            resolve();
+          });
+          delete this.targetClientId;
+        }
+      });
     }
+
   }
 
   /**
@@ -41,6 +57,8 @@ class NewApi {
    * @returns 1. No callbacks: true if connect successfully, false otherwise; 2. With callbacks: doesn't return anything
    */
   registerP2pTarget(targetClientId, options = {}, successCallbackFn, failureCallbackFn) {
+    if (this.clientId === targetClientId) throw new Error('Target client ID can not be the same as source client ID');
+
     if (successCallbackFn || failureCallbackFn) {
       this.io.emit(SOCKET_EVENT.P2P_REGISTER, targetClientId, (targetAvailable) => {
         if (targetAvailable) {
@@ -67,7 +85,11 @@ class NewApi {
   }
 
   emit2() {
+    if (!this.targetClientId) throw new Error('emit2 must be called after targetClientId is set');
+
     const [event, ...args] = arguments;
+
+    if (!event) throw new Error('event must be specified');
 
     // acknowledge case
     if (typeof arguments[arguments.length - 1] === 'function') {
@@ -104,8 +126,8 @@ class NewApi {
   }
 }
 
-module.exports = function p2pClientPlugin(io) {
-  const newApi = new NewApi(io);
+module.exports = function p2pClientPlugin(io, clientId) {
+  const newApi = new NewApi(io, clientId);
   return new Proxy(io, {
     get: (obj, prop) => {
 
@@ -113,6 +135,7 @@ module.exports = function p2pClientPlugin(io) {
       if (prop === 'unregisterP2pTarget') return newApi.unregisterP2pTarget.bind(newApi);
       if (prop === 'emit2' || prop === 'emitP2p') return newApi.emit2.bind(newApi);
       if (prop === 'getClientList') return newApi.getClientList.bind(newApi);
+      if (prop === 'targetClientId') return newApi.targetClientId;
 
       return obj[prop];
     }

@@ -86,8 +86,10 @@ module.exports = function p2pServerPlugin(io) {
           removePostRegisterListeners();
         };
 
-        const targetUnregisterListener = () => {
-          socket.emit(SOCKET_EVENT.P2P_UNREGISTER);
+        const targetUnregisterListener = (doneCallback) => {
+          socket.emit(SOCKET_EVENT.P2P_UNREGISTER, () =>
+            doneCallback()
+          );
           removePostRegisterListeners();
         };
 
@@ -97,9 +99,11 @@ module.exports = function p2pServerPlugin(io) {
           removePostRegisterListeners();
         };
 
-        const sourceUnregisterListener = () => {
+        const sourceUnregisterListener = (doneCallback) => {
           targetClientSocket = findTargetClientSocket(targetClientId);
-          if (targetClientSocket) targetClientSocket.emit(SOCKET_EVENT.P2P_UNREGISTER);
+          if (targetClientSocket) targetClientSocket.emit(SOCKET_EVENT.P2P_UNREGISTER, () =>
+            doneCallback()
+          );
           removePostRegisterListeners();
         };
 

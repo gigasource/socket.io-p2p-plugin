@@ -8,6 +8,7 @@ const test = async () => {
   const connectionSuccess = await io.registerP2pTarget('B', {});
 
   if (connectionSuccess) {
+    console.log(io.targetClientId);
     console.log(await io.getClientList());
 
     io.emit2('testNoAck', {a: 'testNoAck'}, 'b', 2, {c: 3});
@@ -17,8 +18,10 @@ const test = async () => {
     });
 
     setTimeout(() => {
-      io.unregisterP2pTarget();
-      console.log('unregister');
+      // io.disconnect();
+      io.unregisterP2pTarget(() => {
+        console.log('unregister');
+      });
     }, 3000);
   } else {
     // Failed connection -> client can add logic to handle here
