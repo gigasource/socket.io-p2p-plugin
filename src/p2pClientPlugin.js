@@ -13,10 +13,9 @@ class NewApi {
       }
     });
 
-    this.io.on(SOCKET_EVENT.P2P_DISCONNECT, (sourceClientId) => {
-      console.log(`receive p2p disconnect from ${sourceClientId}`);
-      if (sourceClientId === this.targetClientId) delete this.targetClientId;
-    });
+    this.io.on(SOCKET_EVENT.P2P_DISCONNECT, () =>
+      delete this.targetClientId
+    );
 
     this.io.on(SOCKET_EVENT.P2P_UNREGISTER, () => {
       delete this.targetClientId;
@@ -75,6 +74,7 @@ class NewApi {
       const acknowledgeCallbackFn = args.pop(); // last arg is acknowledge callback function
 
       this.io.emit(SOCKET_EVENT.P2P_EMIT_ACKNOWLEDGE, {
+        targetClientId: this.targetClientId,
         event,
         args,
       }, acknowledgeCallbackFn);
@@ -82,6 +82,7 @@ class NewApi {
     // no acknowledge case
     else {
       this.io.emit(SOCKET_EVENT.P2P_EMIT, {
+        targetClientId: this.targetClientId,
         event,
         args,
       });
