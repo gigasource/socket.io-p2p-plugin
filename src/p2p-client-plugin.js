@@ -31,9 +31,7 @@ class NewApi {
   unregisterP2pTarget(doneCallback) {
     if (doneCallback) {
       if (this.targetClientId) {
-        this.io.emit(SOCKET_EVENT.P2P_UNREGISTER, () => {
-          doneCallback();
-        });
+        this.io.emit(SOCKET_EVENT.P2P_UNREGISTER, doneCallback);
         delete this.targetClientId;
       } else {
         doneCallback();

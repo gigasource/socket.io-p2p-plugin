@@ -1,29 +1,38 @@
 const expect = require('expect.js');
 const {SOCKET_EVENT} = require('../../src/util/constants');
-const {startServer, stopServer, startClient, wait} = require('./common');
+const {startServer, stopServer, startClient, wait, terminateClients, generateClientIds} = require('./common');
 
-const client1Id = 'A';
-const client2Id = 'B';
-const client3Id = 'C';
+const numberOfClients = 3;
+let client1Id, client2Id, client3Id;
 
 let client1;
 let client2;
 let client3;
-let server;
-
-beforeEach(async function () {
-  server = startServer();
-  client1 = startClient(client1, client1Id);
-  client2 = startClient(client2, client2Id);
-  client3 = startClient(client3, client3Id);
-  await wait(200);
-});
-
-after(function () {
-  stopServer();
-});
 
 describe('p2p-client-plugin', function () {
+  before(async function () {
+    startServer();
+    await wait(200);
+  });
+
+  beforeEach(async function () {
+    [client1Id, client2Id, client3Id] = generateClientIds(numberOfClients);
+
+    client1 = startClient(client1Id);
+    client2 = startClient(client2Id);
+    client3 = startClient(client3Id);
+    await wait(200);
+  })
+
+  afterEach(async function () {
+    terminateClients(client1, client2, client3);
+    await wait(200);
+  })
+
+  after(function () {
+    stopServer();
+  });
+
   describe('constructor', function () {
     it('should initialize lifecycle listeners', function () {
       expect(client1.listeners(SOCKET_EVENT.P2P_REGISTER)).to.have.length(1);
@@ -64,7 +73,7 @@ describe('p2p-client-plugin', function () {
         connectionSuccess = await client3.registerP2pTarget(client2Id, {});
         expect(connectionSuccess).to.be(false);
       });
-      it('should not allow registering to the source client ID', async function () {
+      it('should not allow registering to the source client ID', function () {
         expect(client1.registerP2pTarget.bind(client1, client1Id)).to.throwError();
       });
     })
@@ -335,9 +344,10 @@ describe('p2p-client-plugin', function () {
       })
 
       it('should show server\'s clientMap correctly ', async function () {
+        await wait(500);
         client1.disconnect();
         await wait(200);
-        clientList = await client3.getClientList();
+        let clientList = await client3.getClientList();
         expect(clientList).to.have.length(2);
 
         client2.disconnect();

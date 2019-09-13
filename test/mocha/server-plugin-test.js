@@ -1,37 +1,47 @@
 const expect = require('expect.js');
 const {SOCKET_EVENT} = require('../../src/util/constants');
-const {startServer, stopServer, startClient, wait} = require('./common');
+const {startServer, stopServer, startClient, wait, terminateClients, generateClientIds} = require('./common');
 
-const client1Id = 'A';
-const client2Id = 'B';
-const client3Id = 'C';
+const numberOfClients = 3;
+let client1Id, client2Id, client3Id;
 
 let client1;
 let client2;
 let client3;
 let server;
 
-beforeEach(async function () {
-  server = startServer();
-  client1 = startClient(client1, client1Id);
-  client2 = startClient(client2, client2Id);
-  client3 = startClient(client3, client3Id);
-  await wait(200);
-});
-
-after(function () {
-  stopServer();
-});
-
 describe('p2p-server-plugin', function () {
+  before(async function () {
+    server = startServer();
+    await wait(200);
+  });
+
+  beforeEach(async function () {
+    [client1Id, client2Id, client3Id] = generateClientIds(numberOfClients);
+
+    client1 = startClient(client1Id);
+    client2 = startClient(client2Id);
+    client3 = startClient(client3Id);
+    await wait(200);
+  })
+
+  afterEach(async function () {
+    terminateClients(client1, client2, client3);
+    await wait(200);
+  })
+
+  after(function () {
+    stopServer();
+  });
+
   describe('p2pServerManager', function () {
-    it('should create \'connect\' event listeners on initialization', async function () {
+    it('should create \'connect\' event listeners on initialization', function () {
       expect(server.listeners('connect')).to.have.length(1);
     });
-    it('should create correct number of sockets', async function () {
+    it('should create correct number of sockets', function () {
       expect(Object.keys(server.sockets.sockets)).to.have.length(3);
     });
-    it('should create necessary event listeners for each socket', async function () {
+    it('should create necessary event listeners for each socket', function () {
       Object.keys(server.sockets.sockets).forEach((key) => {
         const socket = server.sockets.sockets[key];
         expect(socket.listeners('disconnect')).to.have.length(1);
@@ -42,7 +52,7 @@ describe('p2p-server-plugin', function () {
         expect(socket.listeners(SOCKET_EVENT.LIST_CLIENTS)).to.have.length(1);
       });
     });
-    it('should not create post-register event listeners before clients connect', async function () {
+    it('should not create post-register event listeners before clients connect', function () {
       Object.keys(server.sockets.sockets).forEach((key) => {
         const socket = server.sockets.sockets[key];
         expect(socket.listeners('disconnect')).to.have.length(1);
@@ -156,7 +166,7 @@ describe('p2p-server-plugin', function () {
       });
 
       describe('getClientSocketId function', function () {
-        it('should be able to get socket ID of connected clients', async function () {
+        it('should be able to get socket ID of connected clients', function () {
           const client1SocketId = server.getClientSocketId(client1Id);
           const client2SocketId = server.getClientSocketId(client2Id);
           const client3SocketId = server.getClientSocketId(client3Id);
@@ -180,7 +190,7 @@ describe('p2p-server-plugin', function () {
         })
       })
       describe('getAllClientId function', function () {
-        it('should be able to list all IDs of connected clients', async function () {
+        it('should be able to list all IDs of connected clients', function () {
           const idArray = server.getAllClientId();
           expect(idArray).to.contain(client1Id);
           expect(idArray).to.contain(client2Id);
