@@ -1,37 +1,15 @@
 const expect = require('expect.js');
-const {SOCKET_EVENT, SERVER_CONFIG} = require('../../src/util/constants.js');
-
-const socketIO = require('socket.io');
-const http = require('http');
-const p2pServerPlugin = require('../../src/p2pServerPlugin');
+const {SOCKET_EVENT} = require('../../src/util/constants');
+const {startServer, stopServer, startClient} = require('./common');
 
 const client1Id = 'A';
 const client2Id = 'B';
 const client3Id = 'C';
-const p2pClientPlugin = require('../../src/p2pClientPlugin');
-const socketClient = require('socket.io-client');
 
 let client1;
 let client2;
 let client3;
-let httpServer;
 let server;
-let io;
-
-const startServer = function () {
-  httpServer = http.createServer((req, res) => res.end()).listen(SERVER_CONFIG.PORT);
-  io = socketIO.listen(httpServer);
-  return p2pServerPlugin(io);
-}
-
-const stopServer = function () {
-  httpServer.close();
-}
-
-const startClient = function (client, clientId) {
-  const io = socketClient.connect(`http://localhost:${SERVER_CONFIG.PORT}?clientId=${clientId}`);
-  return p2pClientPlugin(io, clientId);
-}
 
 beforeEach(async function () {
   server = startServer();

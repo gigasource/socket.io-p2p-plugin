@@ -1,8 +1,8 @@
 # socket.io-p2p-plugin
 
 This library consists of 2 components:
-  - P2P Server Plugin (src/p2pServerPlugin.js): plugin for [socket.io](https://www.npmjs.com/package/socket.io) lib
-  - P2P Client Plugin (src/p2pClientPlugin.js): plugin for [socket.io-client](https://www.npmjs.com/package/socket.io-client) lib
+  - P2P Server Plugin (src/p2p-server-plugin.js): plugin for [socket.io](https://www.npmjs.com/package/socket.io) lib
+  - P2P Client Plugin (src/p2p-client-plugin.js): plugin for [socket.io-client](https://www.npmjs.com/package/socket.io-client) lib
 
 ## 1. P2P Server Plugin
 This component adds a **P2pServerManager** on top of [socket.io](https://www.npmjs.com/package/socket.io). The manager handles the lifecycle of clients connected to the server and get corresponding socketId of each client.
