@@ -19,7 +19,7 @@ beforeEach(async function () {
   await wait(200);
 });
 
-afterEach(function () {
+after(function () {
   stopServer();
 });
 
@@ -94,7 +94,7 @@ describe('p2p-client-plugin', function () {
 
         await client1.unregisterP2pTarget();
         client1.disconnect();
-        await wait(200);
+        await wait(500);
 
         expect(client2.targetClientId).to.be(client3Id);
         expect(client3.targetClientId).to.be(client2Id);
@@ -151,7 +151,7 @@ describe('p2p-client-plugin', function () {
           })
         });
 
-        await wait(200);
+        await wait(500);
 
         // Start testing -------------------
         let connectionSuccess = await client1.registerP2pTarget(client2Id);

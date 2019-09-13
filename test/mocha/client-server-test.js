@@ -19,7 +19,7 @@ beforeEach(async function () {
   await wait(200);
 });
 
-afterEach(function () {
+after(function () {
   stopServer();
 });
 
@@ -96,6 +96,7 @@ describe('p2p-server-plugin', function () {
     it('should remove post-register event listeners if a client in connection unregisters', async function () {
       await client1.registerP2pTarget(client2Id);
       const keys = [server.getClientSocketId(client1Id), server.getClientSocketId(client2Id)];
+      await wait(200);
 
       keys.forEach((key) => {
         const socket = server.sockets.sockets[key];
