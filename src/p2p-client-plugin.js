@@ -35,6 +35,8 @@ class NewApi {
           doneCallback();
         });
         delete this.targetClientId;
+      } else {
+        doneCallback();
       }
     } else {
       return new Promise(resolve => {
@@ -43,6 +45,8 @@ class NewApi {
             resolve();
           });
           delete this.targetClientId;
+        } else {
+          resolve();
         }
       });
     }
@@ -64,9 +68,9 @@ class NewApi {
         if (targetAvailable) {
           this.targetClientId = targetClientId;
           this.options = options;
-          successCallbackFn();
+          if (successCallbackFn) successCallbackFn();
         } else {
-          failureCallbackFn();
+          if (failureCallbackFn) failureCallbackFn();
         }
       });
     } else {

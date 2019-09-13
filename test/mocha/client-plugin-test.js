@@ -1,6 +1,6 @@
 const expect = require('expect.js');
 const {SOCKET_EVENT} = require('../../src/util/constants');
-const {startServer, stopServer, startClient} = require('./common');
+const {startServer, stopServer, startClient, wait} = require('./common');
 
 const client1Id = 'A';
 const client2Id = 'B';
@@ -16,13 +16,14 @@ beforeEach(async function () {
   client1 = startClient(client1, client1Id);
   client2 = startClient(client2, client2Id);
   client3 = startClient(client3, client3Id);
+  await wait(200);
 });
 
 afterEach(function () {
   stopServer();
 });
 
-describe('p2pClientPlugin', function () {
+describe('p2p-client-plugin', function () {
   describe('constructor', function () {
     it('should initialize lifecycle listeners', function () {
       expect(client1.listeners(SOCKET_EVENT.P2P_REGISTER)).to.have.length(1);
@@ -79,13 +80,22 @@ describe('p2pClientPlugin', function () {
         connectionSuccess = await client2.registerP2pTarget(client3Id, {});
         expect(connectionSuccess).to.be(true);
       });
-      it('should not have any effects if source client disconnected previously', async function () {
+      it('should not have any effects if source client unregistered previously', async function () {
         let connectionSuccess = await client1.registerP2pTarget(client3Id, {});
         expect(connectionSuccess).to.be(true);
-        client1.unregisterP2pTarget();
+
+        connectionSuccess = await client2.registerP2pTarget(client3Id, {});
+        expect(connectionSuccess).to.be(false);
+
+        await client1.unregisterP2pTarget();
+
         connectionSuccess = await client2.registerP2pTarget(client3Id, {});
         expect(connectionSuccess).to.be(true);
-        client1.unregisterP2pTarget();
+
+        await client1.unregisterP2pTarget();
+        client1.disconnect();
+        await wait(200);
+
         expect(client2.targetClientId).to.be(client3Id);
         expect(client3.targetClientId).to.be(client2Id);
       })
@@ -109,14 +119,6 @@ describe('p2pClientPlugin', function () {
     })
     describe('emit2 function', function () {
       this.timeout(5000);
-      it('should throw error if targetClientId is not set', function () {
-        expect(client1.emit2.bind(client1, 'testEvent')).to.throwError();
-      });
-      it('should throw error if event is not specified', async function () {
-        const connectionSuccess = await client1.registerP2pTarget(client2Id);
-        expect(connectionSuccess).to.be(true);
-        expect(client1.emit2.bind(client1)).to.throwError();
-      });
       it('should emit events to correct target', async function () {
         let c2Result, c3Result;
 
@@ -149,6 +151,8 @@ describe('p2pClientPlugin', function () {
           })
         });
 
+        await wait(200);
+
         // Start testing -------------------
         let connectionSuccess = await client1.registerP2pTarget(client2Id);
         expect(connectionSuccess).to.be(true);
@@ -170,6 +174,14 @@ describe('p2pClientPlugin', function () {
         await toC2FromC3EventListener;
         expect(c2Result).to.be(dataC3ToC2);
         await client2.unregisterP2pTarget();
+      });
+      it('should throw error if targetClientId is not set', function () {
+        expect(client1.emit2.bind(client1, 'testEvent')).to.throwError();
+      });
+      it('should throw error if event is not specified', async function () {
+        const connectionSuccess = await client1.registerP2pTarget(client2Id);
+        expect(connectionSuccess).to.be(true);
+        expect(client1.emit2.bind(client1)).to.throwError();
       });
       describe('in no ack case', function () {
         it('should emit an event to connected client', async function () {
@@ -223,24 +235,20 @@ describe('p2pClientPlugin', function () {
           const event = 'testEvent';
           let testResult = 1;
           let ack = false;
-          const eventListener = new Promise(resolve => {
+          const emitAck = new Promise(resolve => {
             client2.on(event, (ackFn) => {
               testResult = 2;
               ackFn();
-              resolve();
-            })
-          });
+            });
 
-          const emitAck = new Promise(resolve => {
             client1.emit2(event, () => {
               ack = true;
               resolve();
             });
           });
 
-          await eventListener;
-          expect(testResult).to.be(2);
           await emitAck;
+          expect(testResult).to.be(2);
           expect(ack).to.be(true);
         });
         it('should emit an event to connected client with arguments', async function () {
@@ -326,15 +334,17 @@ describe('p2pClientPlugin', function () {
         expect(clientList).to.contain(client3Id);
       })
 
-      /**it('should show server\'s clientMap correctly ', async function () {
-        delete server.clientMap[client1Id];
+      it('should show server\'s clientMap correctly ', async function () {
+        client1.disconnect();
+        await wait(200);
         clientList = await client3.getClientList();
         expect(clientList).to.have.length(2);
 
-        delete server.clientMap[client2Id];
+        client2.disconnect();
+        await wait(200);
         clientList = await client3.getClientList();
         expect(clientList).to.have.length(1);
-      })*/ //passed if run independently, not passed if run with other tests
+      })
     });
   })
 })

@@ -64,7 +64,7 @@ module.exports = function p2pServerPlugin(io) {
     });
 
     socket.on(SOCKET_EVENT.P2P_EMIT_ACKNOWLEDGE, ({targetClientId, event, args}, acknowledgeFn) => {
-      if (!targetClientId) throwError(new Error('targetClientId is empty'));
+      if (!targetClientId) throwError(new Error('targetClientId is not set'));
       const targetClientSocket = findTargetClientSocket(targetClientId);
       if (targetClientSocket) targetClientSocket.emit(event, ...args, acknowledgeFn);
     });
@@ -137,7 +137,7 @@ module.exports = function p2pServerPlugin(io) {
     });
   });
 
-  return new Proxy(p2pServerManager, {
+  return new Proxy(io, {
     get: (obj, prop) => {
 
       // if (prop === 'startServer')

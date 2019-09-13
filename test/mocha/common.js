@@ -23,3 +23,13 @@ module.exports.startClient = function (client, clientId) {
   const io = socketClient.connect(`http://localhost:${SERVER_CONFIG.PORT}?clientId=${clientId}`);
   return p2pClientPlugin(io, clientId);
 }
+
+module.exports.wait = async function (ms) {
+  const waitPromise = new Promise(resolve => {
+    setTimeout(() => {
+      resolve();
+    }, ms);
+  });
+
+  await waitPromise;
+}
