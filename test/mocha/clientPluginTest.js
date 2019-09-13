@@ -1,6 +1,5 @@
 const expect = require('expect.js');
 const {SOCKET_EVENT, SERVER_CONFIG} = require('../../src/util/constants.js');
-const sleep = require('sleep');
 
 const socketIO = require('socket.io');
 const http = require('http');
