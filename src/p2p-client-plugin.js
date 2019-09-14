@@ -60,6 +60,7 @@ class NewApi {
    */
   registerP2pTarget(targetClientId, options = {}, successCallbackFn, failureCallbackFn) {
     if (this.clientId === targetClientId) throw new Error('Target client ID can not be the same as source client ID');
+    if (this.targetClientId) throw new Error(`Current target: ${this.targetClientId}, targetClientId must be empty before registering`);
 
     if (successCallbackFn || failureCallbackFn) {
       this.io.emit(SOCKET_EVENT.P2P_REGISTER, targetClientId, (targetAvailable) => {

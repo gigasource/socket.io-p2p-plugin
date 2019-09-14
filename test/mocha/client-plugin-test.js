@@ -67,6 +67,11 @@ describe('p2p-client-plugin', function () {
       it('should not allow registering to the source client ID', function () {
         expect(client1.registerP2pTarget.bind(client1, client1Id)).to.throwError();
       });
+      it('should throw error if clientTargetId is not empty', async function () {
+        let connectionSuccess = await client1.registerP2pTarget(client2Id);
+        expect(connectionSuccess).to.be(true);
+        expect(client1.registerP2pTarget.bind(client1, client3Id)).to.throwError();
+      });
     })
     describe('unregisterP2pTarget function', function () {
       it('should free both clients', async function () {

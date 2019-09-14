@@ -30,9 +30,6 @@ describe('p2p-server-plugin', function () {
     it('should create \'connect\' event listeners on initialization', function () {
       expect(server.listeners('connect')).to.have.length(1);
     });
-    it('should create correct number of sockets', function () {
-      expect(Object.keys(server.sockets.sockets)).to.have.length(3);
-    });
     it('should create necessary event listeners for each socket', function () {
       Object.keys(server.sockets.sockets).forEach((key) => {
         const socket = server.sockets.sockets[key];
@@ -148,6 +145,9 @@ describe('p2p-server-plugin', function () {
       expect(client1Socket.listeners(SOCKET_EVENT.P2P_REGISTER)).to.have.length(1);
       expect(client1Socket.listeners(SOCKET_EVENT.LIST_CLIENTS)).to.have.length(1);
       expect(client1Socket.listeners(SOCKET_EVENT.P2P_UNREGISTER)).to.have.length(0);
+    });
+    it('should create correct number of sockets', function () {
+      expect(Object.keys(server.sockets.sockets)).to.have.length(3);
     });
 
     describe('custom functions', function () {
