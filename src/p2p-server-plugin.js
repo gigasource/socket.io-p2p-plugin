@@ -50,6 +50,7 @@ module.exports = function p2pServerPlugin(io) {
     }
 
     socket.on('disconnect', reason => {
+      console.log('dis');
       p2pServerManager.removeClient(clientId);
     });
 

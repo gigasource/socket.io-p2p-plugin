@@ -3,24 +3,23 @@ const {SOCKET_EVENT} = require('../../src/util/constants');
 const {startClient, wait, terminateClients, generateClientIds} = require('./common');
 
 describe('p2p-client-plugin', function () {
-  const numberOfClients = 3;
-  let client1Id, client2Id, client3Id;
+  const numberOfClients = 4;
+  let client1Id, client2Id, client3Id, client4Id;
 
-  let client1;
-  let client2;
-  let client3;
+  let client1, client2, client3, client4;
 
   beforeEach(async function () {
-    [client1Id, client2Id, client3Id] = generateClientIds(numberOfClients);
+    [client1Id, client2Id, client3Id, client4Id] = generateClientIds(numberOfClients);
 
     client1 = startClient(client1Id);
     client2 = startClient(client2Id);
     client3 = startClient(client3Id);
+    client4 = startClient(client4Id);
     await wait(200);
   })
 
   afterEach(async function () {
-    terminateClients(client1, client2, client3);
+    terminateClients(client1, client2, client3, client4);
     await wait(200);
   })
 
@@ -97,6 +96,9 @@ describe('p2p-client-plugin', function () {
         connectionSuccess = await client2.registerP2pTarget(client3Id, {});
         expect(connectionSuccess).to.be(true);
 
+        connectionSuccess = await client1.registerP2pTarget(client4Id, {});
+        expect(connectionSuccess).to.be(true);
+
         await client1.unregisterP2pTarget();
         client1.disconnect();
         await wait(500);
@@ -134,6 +136,13 @@ describe('p2p-client-plugin', function () {
         const dataC1ToC2 = 'from1to2';
         const dataC1ToC3 = 'from1to3';
         const dataC3ToC2 = 'from3to2';
+
+        /*
+         Test order: (data the clients receive must be accurate)
+         1. client1 -> client2 with eventC1ToC2 using dataC1ToC2 -> c2Result === dataC1ToC2
+         2. client1 -> client3 with eventC1ToC3 using dataC1ToC3 -> c3Result === dataC1ToC3
+         3. client3 -> client2 with eventC3ToC2 using dataC3ToC2 -> c2Result === dataC3ToC2
+         */
 
         const toC2FromC1EventListener = new Promise(resolve => {
           client2.on(eventC1ToC2, arg => {
@@ -321,19 +330,19 @@ describe('p2p-client-plugin', function () {
 
       it('should list all connected client ids', async function () {
         let clientList = await client1.getClientList();
-        expect(clientList).to.have.length(3);
+        expect(clientList).to.have.length(numberOfClients);
         expect(clientList).to.contain(client1Id);
         expect(clientList).to.contain(client2Id);
         expect(clientList).to.contain(client3Id);
         // Ensure that result should be the same with different clients
         clientList = await client2.getClientList();
-        expect(clientList).to.have.length(3);
+        expect(clientList).to.have.length(numberOfClients);
         expect(clientList).to.contain(client1Id);
         expect(clientList).to.contain(client2Id);
         expect(clientList).to.contain(client3Id);
 
         clientList = await client3.getClientList();
-        expect(clientList).to.have.length(3);
+        expect(clientList).to.have.length(numberOfClients);
         expect(clientList).to.contain(client1Id);
         expect(clientList).to.contain(client2Id);
         expect(clientList).to.contain(client3Id);
@@ -344,12 +353,12 @@ describe('p2p-client-plugin', function () {
         client1.disconnect();
         await wait(200);
         let clientList = await client3.getClientList();
-        expect(clientList).to.have.length(2);
+        expect(clientList).to.have.length(numberOfClients - 1);
 
         client2.disconnect();
         await wait(200);
         clientList = await client3.getClientList();
-        expect(clientList).to.have.length(1);
+        expect(clientList).to.have.length(numberOfClients - 2);
       })
     });
   })
