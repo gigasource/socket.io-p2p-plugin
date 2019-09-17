@@ -25,7 +25,7 @@ class NewApi {
 
     this.io.on(SOCKET_EVENT.SERVER_ERROR, (err) => {
       console.error(`Error emitted from server: ${err}`);
-    })
+    });
   }
 
   unregisterP2pTarget(doneCallback) {

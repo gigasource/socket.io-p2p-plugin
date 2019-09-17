@@ -5,16 +5,20 @@ const ioRaw = socketClient.connect(`http://localhost:9000?clientId=${sourceClien
 const io = p2pClientPlugin(ioRaw);
 const {createClientStream} = require('../../lib/stream.js');
 
-const {Throttle} = require('stream-throttle');
-
 const {StringDecoder} = require('string_decoder');
 const decoder = new StringDecoder('utf8');
 
 const duplex = createClientStream(io, {
-  highWaterMark: 1
+  remainOnDisconnect: true,
+  highWaterMark: 50
 });
 
-// setTimeout(() => {
-//   const chunk = duplex.read();
-// },3000);
-duplex.pipe(new Throttle({rate: 10})).pipe(process.stdout);
+duplex.pipe(process.stdout);
+
+// setInterval(() => {
+//   const chunk = duplex.read(5);
+//   if (chunk) {
+//     const s = decoder.write(chunk);
+//     console.log(s);
+//   }
+// }, 500);

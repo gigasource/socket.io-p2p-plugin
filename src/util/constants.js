@@ -10,7 +10,6 @@ module.exports.SOCKET_EVENT = Object.freeze({
   SERVER_ERROR: 'SERVER_ERROR',
   // Stream events
   P2P_EMIT_STREAM: 'P2P_EMIT_STREAM',
-  TARGET_HIGH_WATERMARK_REACHED: 'TARGET_HIGH_WATERMARK_REACHED',
 });
 
 module.exports.SERVER_CONFIG = Object.freeze({

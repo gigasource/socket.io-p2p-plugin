@@ -6,26 +6,26 @@ const io = p2pClientPlugin(ioRaw);
 const {createClientStream} = require('../../lib/stream.js');
 
 async function test() {
+  const connectionSuccess = await io.registerP2pTarget('B');
+  let i = 0;
   const duplex = createClientStream(io);
-
   const cb = (i) => console.log('write success for ' + i);
 
-  const connectionSuccess = await io.registerP2pTarget('B');
+  // duplex.write = new Proxy(duplex.write, {
+  //   apply: (fn, thisArg, args) => {
+  //     console.log(`write called, arg = ${args[0]}`);
+  //     return fn.apply(thisArg, args);
+  //   }
+  // });
 
-  if (connectionSuccess) {
-    console.log('connect success');
+  setInterval(() => {
+    duplex.write('a very loooooooooooooooooooooooooooooooooooooooooong message' + i + '\n');
+    i++;
+  }, 500);
 
-    // duplex.write('hello', 'utf8');
-    // duplex.write(' from ', 'utf8');
-    // duplex.write(sourceClientId, 'utf8');
-
-    for(let i = 0; i < 20; i++) {
-      duplex.write('a very loooooooooooooooooooooooooooooooooooooooooong message' + i + '\n', cb.bind(null, i));
-    }
-
-    // duplex.write(' from ');
-    // duplex.write(sourceClientId);
-  }
+  // setTimeout(async () => {
+  //   const connectionSuccess = await io.registerP2pTarget('B');
+  // }, 3000);
 }
 
 test();
