@@ -1,40 +1,14 @@
 const {Duplex} = require('stream');
 const {SOCKET_EVENT} = require('../util/constants');
-const {StringDecoder} = require('string_decoder');
-const decoder = new StringDecoder('utf8');
-
-function emitClose(stream) {
-  stream.emit('close');
-}
 
 module.exports.createClientStream = function (p2pClientPlugin, options) {
   let writeCallbackFn;
 
   const duplex = new Duplex({
     ...options,
-    emitClose: false,
   });
 
   // Lifecycle handlers & events
-  duplex._final = function (callback) {
-    if (!p2pClientPlugin.targetClientId) {
-      p2pClientPlugin.once('connect', () => {
-        duplex._final(callback);
-      });
-      return;
-    }
-    duplex.destroy();
-    callback();
-    process.nextTick(emitClose, duplex);
-  };
-
-  duplex._destroy = function (err, callback) {
-    if (!p2pClientPlugin.targetClientId) {
-      callback(err);
-      process.nextTick(emitClose, duplex);
-    }
-  };
-
   duplex.on('end', duplexOnEnd);
   duplex.on('error', duplexOnError);
 
