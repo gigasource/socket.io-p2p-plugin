@@ -117,6 +117,9 @@ module.exports = function p2pServerPlugin(io) {
 
         // successful connection
         p2pRegisterCallbackFn(true);
+        // Notify the clients that connection has been established
+        socket.emit(SOCKET_EVENT.P2P_REGISTER_SUCCESS);
+        targetClientSocket.emit(SOCKET_EVENT.P2P_REGISTER_SUCCESS);
       });
 
       targetClientSocket.once(SOCKET_EVENT.P2P_REGISTER_FAILED, () => {
