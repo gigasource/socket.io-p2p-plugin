@@ -362,4 +362,36 @@ describe('p2p-client-plugin', function () {
       })
     });
   })
+  describe('created clients', function () {
+    it('should be notified when their peers disconnect/unregister', async function () {
+      let result1, result2;
+      const connectionSuccess12 = await client1.registerP2pTarget(client2Id);
+      const connectionSuccess34 = await client3.registerP2pTarget(client4Id);
+
+      expect(connectionSuccess12).to.be(true);
+      expect(connectionSuccess34).to.be(true);
+
+      const listener1 = new Promise(resolve => {
+        client1.on(SOCKET_EVENT.P2P_DISCONNECT, () => {
+          result1 = 'client 2 disconnected';
+          resolve(null);
+        })
+      });
+
+      const listener2 = new Promise(resolve => {
+        client3.on(SOCKET_EVENT.P2P_UNREGISTER, () => {
+          result2 = 'client 4 unregistered';
+          resolve(null);
+        });
+      });
+
+      client2.disconnect();
+      client4.unregisterP2pTarget();
+
+      await listener1;
+      await listener2;
+      expect(result1).to.be('client 2 disconnected');
+      expect(result2).to.be('client 4 unregistered');
+    });
+  })
 })

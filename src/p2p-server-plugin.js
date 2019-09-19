@@ -81,39 +81,38 @@ module.exports = function p2pServerPlugin(io) {
       targetClientSocket.once(SOCKET_EVENT.P2P_REGISTER_SUCCESS, () => {
         targetClientSocket.removeAllListeners(SOCKET_EVENT.P2P_REGISTER_FAILED);
 
-        const targetDisconnectListener = () => {
-          socket.emit(SOCKET_EVENT.P2P_DISCONNECT);
-          removePostRegisterListeners();
-        };
-
-        const targetUnregisterListener = (doneCallback) => {
-          socket.emit(SOCKET_EVENT.P2P_UNREGISTER, doneCallback);
-          removePostRegisterListeners();
-        };
-
-        const sourceDisconnectListener = () => {
+        const disconnectListener = () => {
           targetClientSocket = findTargetClientSocket(targetClientId);
           if (targetClientSocket) targetClientSocket.emit(SOCKET_EVENT.P2P_DISCONNECT);
+          if (socket) socket.emit(SOCKET_EVENT.P2P_DISCONNECT);
           removePostRegisterListeners();
         };
 
-        const sourceUnregisterListener = (doneCallback) => {
+        const unregisterListener = (doneCallback) => {
           targetClientSocket = findTargetClientSocket(targetClientId);
           if (targetClientSocket) targetClientSocket.emit(SOCKET_EVENT.P2P_UNREGISTER, doneCallback);
+          if (socket) socket.emit(SOCKET_EVENT.P2P_UNREGISTER, doneCallback);
           removePostRegisterListeners();
         };
 
         const removePostRegisterListeners = () => {
-          socket.off(SOCKET_EVENT.P2P_UNREGISTER, sourceUnregisterListener);
-          targetClientSocket.off(SOCKET_EVENT.P2P_UNREGISTER, targetUnregisterListener);
-          socket.off('disconnect', sourceDisconnectListener);
-          targetClientSocket.off('disconnect', targetDisconnectListener);
+          targetClientSocket = findTargetClientSocket(targetClientId);
+
+          if (socket) {
+            socket.off(SOCKET_EVENT.P2P_UNREGISTER, unregisterListener);
+            socket.off('disconnect', disconnectListener);
+          }
+
+          if (targetClientSocket) {
+            targetClientSocket.off(SOCKET_EVENT.P2P_UNREGISTER, unregisterListener);
+            targetClientSocket.off('disconnect', disconnectListener);
+          }
         }
 
-        targetClientSocket.once('disconnect', targetDisconnectListener);
-        targetClientSocket.once(SOCKET_EVENT.P2P_UNREGISTER, targetUnregisterListener);
-        socket.once('disconnect', sourceDisconnectListener);
-        socket.once(SOCKET_EVENT.P2P_UNREGISTER, sourceUnregisterListener);
+        targetClientSocket.once('disconnect', disconnectListener);
+        targetClientSocket.once(SOCKET_EVENT.P2P_UNREGISTER, unregisterListener);
+        socket.once('disconnect', disconnectListener);
+        socket.once(SOCKET_EVENT.P2P_UNREGISTER, unregisterListener);
 
         // successful connection
         p2pRegisterCallbackFn(true);

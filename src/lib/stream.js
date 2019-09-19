@@ -4,25 +4,19 @@ const {SOCKET_EVENT} = require('../util/constants');
 module.exports.createClientStream = function (p2pClientPlugin, options) {
   let writeCallbackFn;
 
-  const duplex = new Duplex({
+  let duplex = new Duplex({
     ...options,
   });
 
   // Lifecycle handlers & events
-  duplex.on('end', duplexOnEnd);
   duplex.on('error', duplexOnError);
 
-  function duplexOnEnd() {
-    if (!duplex.destroyed && duplex._writableState.finished) {
-      duplex.destroy();
-    }
-  }
-
   function duplexOnError(err) {
+    if (err) console.error(`Error thrown by duplex stream: ${err.message}, stream will be destroyed`);
     duplex.removeListener('error', duplexOnError);
     duplex.destroy();
     if (duplex.listenerCount('error') === 0) {
-      // Do not suppress the throwing behavior.
+      // Do not suppress the throwing behavior - this 'error' event will be caught by system if not handled by duplex
       duplex.emit('error', err);
     }
   }
@@ -42,24 +36,37 @@ module.exports.createClientStream = function (p2pClientPlugin, options) {
   // Readable stream handlers & events
   duplex._read = function () {
     if (p2pClientPlugin.targetClientId) {
-      if (writeCallbackFn && typeof writeCallbackFn === 'function') writeCallbackFn();
+      if (typeof writeCallbackFn === 'function') writeCallbackFn();
       // data has been consumed -> signal the other client to resume writing
     }
   };
 
   // Socket.IO events
-  p2pClientPlugin.on(SOCKET_EVENT.P2P_EMIT_STREAM, (chunk, callbackFn) => {
+  function onReceiveStreamData(chunk, callbackFn) {
     if (!duplex.push(chunk)) { // if reach highWaterMark -> signal the other client to pause writing
       writeCallbackFn = callbackFn;
     } else {
       callbackFn();
     }
-  });
+  }
 
-  p2pClientPlugin.once('disconnect', () => {
-    if (duplex.destroyed) return;
-    duplex.push(null);
-  });
+  function destroyDuplex() {
+    if (!duplex.destroyed) duplex.destroy();
+    removeSocketListeners();
+  }
+
+  function removeSocketListeners() {
+    p2pClientPlugin.off(SOCKET_EVENT.P2P_EMIT_STREAM, onReceiveStreamData);
+    p2pClientPlugin.off('disconnect', destroyDuplex);
+    p2pClientPlugin.off(SOCKET_EVENT.P2P_DISCONNECT, destroyDuplex);
+    p2pClientPlugin.off(SOCKET_EVENT.P2P_UNREGISTER, destroyDuplex);
+  }
+
+  p2pClientPlugin.on(SOCKET_EVENT.P2P_EMIT_STREAM, onReceiveStreamData);
+
+  p2pClientPlugin.once('disconnect', destroyDuplex);
+  p2pClientPlugin.once(SOCKET_EVENT.P2P_DISCONNECT, destroyDuplex);
+  p2pClientPlugin.once(SOCKET_EVENT.P2P_UNREGISTER, destroyDuplex);
 
   return duplex;
 }
