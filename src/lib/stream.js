@@ -1,7 +1,7 @@
 const {Duplex} = require('stream');
 const {SOCKET_EVENT} = require('../util/constants');
 
-module.exports.createClientStream = function (p2pClientPlugin, options) {
+module.exports = function createClientStream(p2pClientPlugin, options) {
   let writeCallbackFn;
 
   let duplex = new Duplex({
