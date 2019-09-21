@@ -37,7 +37,7 @@ module.exports = function p2pServerPlugin(io) {
     p2pServerManager.addClient(clientId, socket.id);
 
     const throwError = (err) => {
-      console.error(`From client with id ${p2pServerManager.findClientIdBySocketId(socket.id)}:`);
+      console.error(`From client with id '${p2pServerManager.findClientIdBySocketId(socket.id)}':`);
       console.error(err);
       socket.emit(SOCKET_EVENT.SERVER_ERROR, err.toString());
     }
@@ -130,9 +130,7 @@ module.exports = function p2pServerPlugin(io) {
       targetClientSocket.emit(SOCKET_EVENT.P2P_REGISTER, clientId);
     });
 
-    socket.on(SOCKET_EVENT.LIST_CLIENTS, (clientCallbackFn) => {
-      clientCallbackFn(p2pServerManager.getAllClientId());
-    });
+    socket.on(SOCKET_EVENT.LIST_CLIENTS, clientCallbackFn => clientCallbackFn(p2pServerManager.getAllClientId()));
   });
 
   return new Proxy(io, {

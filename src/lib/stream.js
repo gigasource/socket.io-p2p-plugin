@@ -43,6 +43,8 @@ module.exports = function createClientStream(p2pClientPlugin, options) {
 
   // Socket.IO events
   function onReceiveStreamData(chunk, callbackFn) {
+    if (chunk instanceof Array) chunk = Buffer.from(chunk);
+
     if (!duplex.push(chunk)) { // if reach highWaterMark -> signal the other client to pause writing
       writeCallbackFn = callbackFn;
     } else {
