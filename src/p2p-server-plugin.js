@@ -32,112 +32,96 @@ class P2pServerManager {
 module.exports = function p2pServerPlugin(io) {
   const p2pServerManager = new P2pServerManager();
 
+
+
   io.on('connect', (socket) => {
     const {clientId} = socket.request._query;
     p2pServerManager.addClient(clientId, socket.id);
 
-    const throwError = (err) => {
-      console.error(`From client with id '${p2pServerManager.findClientIdBySocketId(socket.id)}':`);
-      console.error(err);
+    const emitError = (err) => {
+      console.error(`From client with id '${p2pServerManager.findClientIdBySocketId(socket.id)}': ${err}`);
       socket.emit(SOCKET_EVENT.SERVER_ERROR, err.toString());
     }
-
     const findTargetClientSocket = (targetClientId) => {
       const targetClientSocket = io.sockets.connected[p2pServerManager.getClientSocketId(targetClientId)];
-      if (!targetClientSocket)
-        throwError(new Error(`Could not find target client ${targetClientId} socket, client is not registered to the server`));
+      if (!targetClientSocket) emitError(new Error(`Could not find target client '${targetClientId}' socket`));
       return targetClientSocket;
     }
 
     socket.on('disconnect', reason => {
       p2pServerManager.removeClient(clientId);
     });
-
     socket.on('reconnect', attemptNumber => {
       p2pServerManager.addClient(clientId, socket.id);
     });
-
     socket.on(SOCKET_EVENT.P2P_EMIT, ({targetClientId, event, args}) => {
-      if (!targetClientId) throwError(new Error('targetClientId is not set'));
+      if (!targetClientId) emitError(new Error('targetClientId is not set'));
       const targetClientSocket = findTargetClientSocket(targetClientId);
       if (targetClientSocket) targetClientSocket.emit(event, ...args);
     });
-
     socket.on(SOCKET_EVENT.P2P_EMIT_ACKNOWLEDGE, ({targetClientId, event, args}, acknowledgeFn) => {
-      if (!targetClientId) throwError(new Error('targetClientId is not set'));
+      if (!targetClientId) emitError(new Error('targetClientId is not set'));
       const targetClientSocket = findTargetClientSocket(targetClientId);
       if (targetClientSocket) targetClientSocket.emit(event, ...args, acknowledgeFn);
     });
-
     socket.on(SOCKET_EVENT.P2P_REGISTER, (targetClientId, p2pRegisterCallbackFn) => {
       let targetClientSocket = findTargetClientSocket(targetClientId);
 
       if (!targetClientSocket) {
-        throwError(new Error('Target client is not registered to the server'));
+        emitError(new Error('Target client is not registered to the server'));
         p2pRegisterCallbackFn(false);
         return;
       }
 
-      targetClientSocket.once(SOCKET_EVENT.P2P_REGISTER_SUCCESS, () => {
-        targetClientSocket.removeAllListeners(SOCKET_EVENT.P2P_REGISTER_FAILED);
+      targetClientSocket.emit(SOCKET_EVENT.P2P_REGISTER, clientId, registerSuccess => {
+        if (registerSuccess) {
+          const disconnectListener = () => {
+            targetClientSocket = findTargetClientSocket(targetClientId);
+            if (targetClientSocket) targetClientSocket.emit(SOCKET_EVENT.P2P_DISCONNECT);
+            if (socket) socket.emit(SOCKET_EVENT.P2P_DISCONNECT);
 
-        const disconnectListener = () => {
-          targetClientSocket = findTargetClientSocket(targetClientId);
-          if (targetClientSocket) targetClientSocket.emit(SOCKET_EVENT.P2P_DISCONNECT);
-          if (socket) socket.emit(SOCKET_EVENT.P2P_DISCONNECT);
-          removePostRegisterListeners();
-        };
+            removePostRegisterListeners(targetClientSocket);
+            removePostRegisterListeners(socket);
+          };
+          const unregisterListener = callback => {
+            targetClientSocket = findTargetClientSocket(targetClientId);
+            if (targetClientSocket) targetClientSocket.emit(SOCKET_EVENT.P2P_UNREGISTER, callback);
+            if (socket) socket.emit(SOCKET_EVENT.P2P_UNREGISTER, callback);
 
-        const unregisterListener = (doneCallback) => {
-          targetClientSocket = findTargetClientSocket(targetClientId);
-          if (targetClientSocket) targetClientSocket.emit(SOCKET_EVENT.P2P_UNREGISTER, doneCallback);
-          if (socket) socket.emit(SOCKET_EVENT.P2P_UNREGISTER, doneCallback);
-          removePostRegisterListeners();
-        };
-
-        const removePostRegisterListeners = () => {
-          targetClientSocket = findTargetClientSocket(targetClientId);
-
-          if (socket) {
-            socket.off(SOCKET_EVENT.P2P_UNREGISTER, unregisterListener);
-            socket.off('disconnect', disconnectListener);
+            removePostRegisterListeners(targetClientSocket);
+            removePostRegisterListeners(socket);
+          };
+          const registerStreamListener = (targetClientId, callback) => {
+            const sk = findTargetClientSocket(targetClientId);
+            if (sk) sk.emit(SOCKET_EVENT.P2P_REGISTER_STREAM, callback);
           }
 
-          if (targetClientSocket) {
-            targetClientSocket.off(SOCKET_EVENT.P2P_UNREGISTER, unregisterListener);
-            targetClientSocket.off('disconnect', disconnectListener);
+          const addPostRegisterListeners = (sk) => {
+            sk.once('disconnect', disconnectListener);
+            sk.once(SOCKET_EVENT.P2P_UNREGISTER, unregisterListener);
+            sk.on(SOCKET_EVENT.P2P_REGISTER_STREAM, registerStreamListener);
           }
+          const removePostRegisterListeners = (sk) => {
+            if (sk) {
+              sk.removeAllListeners(SOCKET_EVENT.P2P_UNREGISTER);
+              sk.removeAllListeners(SOCKET_EVENT.P2P_REGISTER_STREAM);
+              sk.off('disconnect', disconnectListener);
+            }
+          }
+
+          addPostRegisterListeners(socket);
+          addPostRegisterListeners(targetClientSocket);
+        } else {
+          emitError(new Error(`Target client ${targetClientId} refuses the connection`));
         }
-
-        targetClientSocket.once('disconnect', disconnectListener);
-        targetClientSocket.once(SOCKET_EVENT.P2P_UNREGISTER, unregisterListener);
-        socket.once('disconnect', disconnectListener);
-        socket.once(SOCKET_EVENT.P2P_UNREGISTER, unregisterListener);
-
-        // successful connection
-        p2pRegisterCallbackFn(true);
-        // Notify the clients that connection has been established
-        socket.emit(SOCKET_EVENT.P2P_REGISTER_SUCCESS);
-        targetClientSocket.emit(SOCKET_EVENT.P2P_REGISTER_SUCCESS);
+        p2pRegisterCallbackFn(registerSuccess);
       });
-
-      targetClientSocket.once(SOCKET_EVENT.P2P_REGISTER_FAILED, () => {
-        targetClientSocket.removeAllListeners(SOCKET_EVENT.P2P_REGISTER_SUCCESS);
-        throwError(new Error(`Target client ${targetClientId} refuses the connection`));
-        p2pRegisterCallbackFn(false);
-      });
-
-      targetClientSocket.emit(SOCKET_EVENT.P2P_REGISTER, clientId);
     });
-
     socket.on(SOCKET_EVENT.LIST_CLIENTS, clientCallbackFn => clientCallbackFn(p2pServerManager.getAllClientId()));
   });
 
   return new Proxy(io, {
     get: (obj, prop) => {
-
-      // if (prop === 'startServer')
-      // if (prop === 'stopServer')
 
       if (prop === 'getClientSocketId') return p2pServerManager.getClientSocketId.bind(p2pServerManager);
       if (prop === 'getAllClientId') return p2pServerManager.getAllClientId.bind(p2pServerManager);

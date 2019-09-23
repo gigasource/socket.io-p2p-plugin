@@ -45,13 +45,13 @@ describe('p2p-server-plugin', function () {
       Object.keys(server.sockets.sockets).forEach((key) => {
         const socket = server.sockets.sockets[key];
         expect(socket.listeners('disconnect')).to.have.length(1);
-        expect(socket.listeners(SOCKET_EVENT.P2P_REGISTER_SUCCESS)).to.have.length(0);
-        expect(socket.listeners(SOCKET_EVENT.P2P_REGISTER_FAILED)).to.have.length(0);
         expect(socket.listeners(SOCKET_EVENT.P2P_UNREGISTER)).to.have.length(0);
+        expect(socket.listeners(SOCKET_EVENT.P2P_REGISTER_STREAM)).to.have.length(0);
       });
     });
     it('should create post-register event listeners after clients connect', async function () {
-      await client1.registerP2pTarget(client2Id);
+      const connectionSuccess = await client1.registerP2pTarget(client2Id);
+      expect(connectionSuccess).to.be(true);
 
       const keys = [server.getClientSocketId(client1Id), server.getClientSocketId(client2Id)];
 
@@ -64,10 +64,12 @@ describe('p2p-server-plugin', function () {
         expect(socket.listeners(SOCKET_EVENT.P2P_REGISTER)).to.have.length(1);
         expect(socket.listeners(SOCKET_EVENT.LIST_CLIENTS)).to.have.length(1);
         expect(socket.listeners(SOCKET_EVENT.P2P_UNREGISTER)).to.have.length(1); // post-register listener
+        expect(socket.listeners(SOCKET_EVENT.P2P_REGISTER_STREAM)).to.have.length(1); // post-register listener
       });
     });
     it('should not create post-register event listeners if client fails to register', async function () {
-      await client1.registerP2pTarget(client2Id);
+      let connectionSuccess = await client1.registerP2pTarget(client2Id);
+      expect(connectionSuccess).to.be(true);
 
       const keys = [server.getClientSocketId(client1Id), server.getClientSocketId(client2Id)];
 
@@ -80,9 +82,12 @@ describe('p2p-server-plugin', function () {
         expect(socket.listeners(SOCKET_EVENT.P2P_REGISTER)).to.have.length(1);
         expect(socket.listeners(SOCKET_EVENT.LIST_CLIENTS)).to.have.length(1);
         expect(socket.listeners(SOCKET_EVENT.P2P_UNREGISTER)).to.have.length(1); // post-register listener
+        expect(socket.listeners(SOCKET_EVENT.P2P_REGISTER_STREAM)).to.have.length(1); // post-register listener
       });
 
-      await client3.registerP2pTarget(client2Id);
+      connectionSuccess = await client3.registerP2pTarget(client2Id);
+      expect(connectionSuccess).to.be(false);
+
       const client3Socket = server.sockets.sockets[server.getClientSocketId(client3Id)];
       expect(client3Socket.listeners('disconnect')).to.have.length(1);
       expect(client3Socket.listeners('reconnect')).to.have.length(1);
@@ -91,11 +96,13 @@ describe('p2p-server-plugin', function () {
       expect(client3Socket.listeners(SOCKET_EVENT.P2P_REGISTER)).to.have.length(1);
       expect(client3Socket.listeners(SOCKET_EVENT.LIST_CLIENTS)).to.have.length(1);
       expect(client3Socket.listeners(SOCKET_EVENT.P2P_UNREGISTER)).to.have.length(0);
+      expect(client3Socket.listeners(SOCKET_EVENT.P2P_REGISTER_STREAM)).to.have.length(0); // post-register listener
     });
     it('should remove post-register event listeners if a client in connection unregisters', async function () {
-      await client1.registerP2pTarget(client2Id);
+      let connectionSuccess = await client1.registerP2pTarget(client2Id);
+      expect(connectionSuccess).to.be(true);
+
       const keys = [server.getClientSocketId(client1Id), server.getClientSocketId(client2Id)];
-      await wait(200);
 
       keys.forEach((key) => {
         const socket = server.sockets.sockets[key];
@@ -106,22 +113,27 @@ describe('p2p-server-plugin', function () {
         expect(socket.listeners(SOCKET_EVENT.P2P_REGISTER)).to.have.length(1);
         expect(socket.listeners(SOCKET_EVENT.LIST_CLIENTS)).to.have.length(1);
         expect(socket.listeners(SOCKET_EVENT.P2P_UNREGISTER)).to.have.length(1); // post-register listener
+        expect(socket.listeners(SOCKET_EVENT.P2P_REGISTER_STREAM)).to.have.length(1); // post-register listener
       });
 
       await client2.unregisterP2pTarget();
+
       keys.forEach((key) => {
         const socket = server.sockets.sockets[key];
-        expect(socket.listeners('disconnect')).to.have.length(1); // 1 extra 'disconnect' listener after registering
+        expect(socket.listeners('disconnect')).to.have.length(1);
         expect(socket.listeners('reconnect')).to.have.length(1);
         expect(socket.listeners(SOCKET_EVENT.P2P_EMIT)).to.have.length(1);
         expect(socket.listeners(SOCKET_EVENT.P2P_EMIT_ACKNOWLEDGE)).to.have.length(1);
         expect(socket.listeners(SOCKET_EVENT.P2P_REGISTER)).to.have.length(1);
         expect(socket.listeners(SOCKET_EVENT.LIST_CLIENTS)).to.have.length(1);
         expect(socket.listeners(SOCKET_EVENT.P2P_UNREGISTER)).to.have.length(0); // post-register listener
+        expect(socket.listeners(SOCKET_EVENT.P2P_REGISTER_STREAM)).to.have.length(0); // post-register listener
       });
     });
     it('should remove post-register event listeners if a client in connection disconnects', async function () {
-      await client1.registerP2pTarget(client2Id);
+      const connectionSuccess = await client1.registerP2pTarget(client2Id);
+      expect(connectionSuccess).to.be(true);
+
       const keys = [server.getClientSocketId(client1Id), server.getClientSocketId(client2Id)];
 
       keys.forEach((key) => {
@@ -133,6 +145,7 @@ describe('p2p-server-plugin', function () {
         expect(socket.listeners(SOCKET_EVENT.P2P_REGISTER)).to.have.length(1);
         expect(socket.listeners(SOCKET_EVENT.LIST_CLIENTS)).to.have.length(1);
         expect(socket.listeners(SOCKET_EVENT.P2P_UNREGISTER)).to.have.length(1); // post-register listener
+        expect(socket.listeners(SOCKET_EVENT.P2P_REGISTER_STREAM)).to.have.length(1); // post-register listener
       });
 
       client2.disconnect();
@@ -145,6 +158,7 @@ describe('p2p-server-plugin', function () {
       expect(client1Socket.listeners(SOCKET_EVENT.P2P_REGISTER)).to.have.length(1);
       expect(client1Socket.listeners(SOCKET_EVENT.LIST_CLIENTS)).to.have.length(1);
       expect(client1Socket.listeners(SOCKET_EVENT.P2P_UNREGISTER)).to.have.length(0);
+      expect(client1Socket.listeners(SOCKET_EVENT.P2P_REGISTER_STREAM)).to.have.length(0); // post-register listener
     });
     it('should create correct number of sockets', function () {
       expect(Object.keys(server.sockets.sockets)).to.have.length(3);

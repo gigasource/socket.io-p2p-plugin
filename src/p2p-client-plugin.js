@@ -1,145 +1,23 @@
-const {SOCKET_EVENT} = require('./util/constants');
-
-class NewApi {
-  constructor(socket, clientId) {
-    this.socket = socket;
-    this.clientId = clientId;
-
-    this.socket.on(SOCKET_EVENT.P2P_REGISTER, (sourceClientId) => {
-      if (!this.targetClientId) {
-        this.targetClientId = sourceClientId;
-        this.socket.emit(SOCKET_EVENT.P2P_REGISTER_SUCCESS);
-      } else {
-        this.socket.emit(SOCKET_EVENT.P2P_REGISTER_FAILED);
-      }
-    });
-
-    this.socket.on(SOCKET_EVENT.P2P_DISCONNECT, () => {
-      if (this.targetClientId) delete this.targetClientId;
-    });
-
-    this.socket.on(SOCKET_EVENT.P2P_UNREGISTER, (doneCallback) => {
-      if (this.targetClientId) delete this.targetClientId;
-      doneCallback();
-    });
-
-    this.socket.on(SOCKET_EVENT.SERVER_ERROR, (err) => {
-      console.error(`Error emitted from server: ${err}`);
-    });
-  }
-
-  unregisterP2pTarget(doneCallback) {
-    if (doneCallback) {
-      if (this.targetClientId) {
-        this.socket.emit(SOCKET_EVENT.P2P_UNREGISTER, doneCallback);
-        delete this.targetClientId;
-      } else {
-        doneCallback();
-      }
-    } else {
-      return new Promise(resolve => {
-        if (this.targetClientId) {
-          this.socket.emit(SOCKET_EVENT.P2P_UNREGISTER, () => {
-            resolve();
-          });
-          delete this.targetClientId;
-        } else {
-          resolve();
-        }
-      });
-    }
-
-  }
-
-  /**
-   * @param targetClientId Id of the client you want to connect to
-   * @param options Not yet used
-   * @param successCallbackFn
-   * @param failureCallbackFn
-   * @returns 1. No callbacks: true if connect successfully, false otherwise; 2. With callbacks: doesn't return anything
-   */
-  registerP2pTarget(targetClientId, options = {}, successCallbackFn, failureCallbackFn) {
-    if (this.clientId === targetClientId) throw new Error('Target client ID can not be the same as source client ID');
-    if (this.targetClientId) throw new Error(`Current target: ${this.targetClientId}, targetClientId must be empty before registering`);
-
-    if (successCallbackFn || failureCallbackFn) {
-      this.socket.emit(SOCKET_EVENT.P2P_REGISTER, targetClientId, (targetAvailable) => {
-        if (targetAvailable) {
-          this.targetClientId = targetClientId;
-          this.options = options;
-          if (successCallbackFn) successCallbackFn();
-        } else {
-          if (failureCallbackFn) failureCallbackFn();
-        }
-      });
-    } else {
-      return new Promise(resolve => {
-        this.socket.emit(SOCKET_EVENT.P2P_REGISTER, targetClientId, (targetAvailable) => {
-          if (targetAvailable) {
-            this.targetClientId = targetClientId;
-            this.options = options;
-            resolve(true);
-          } else {
-            resolve(false);
-          }
-        });
-      });
-    }
-  }
-
-  emit2() {
-    if (!this.targetClientId) throw new Error('emit2 must be called after targetClientId is set');
-
-    const [event, ...args] = arguments;
-
-    if (!event) throw new Error('event must be specified');
-
-    // acknowledge case
-    if (typeof arguments[arguments.length - 1] === 'function') {
-      const acknowledgeCallbackFn = args.pop(); // last arg is acknowledge callback function
-
-      this.socket.emit(SOCKET_EVENT.P2P_EMIT_ACKNOWLEDGE, {
-        targetClientId: this.targetClientId,
-        event,
-        args,
-      }, acknowledgeCallbackFn);
-    }
-    // no acknowledge case
-    else {
-      this.socket.emit(SOCKET_EVENT.P2P_EMIT, {
-        targetClientId: this.targetClientId,
-        event,
-        args,
-      });
-    }
-  }
-
-  getClientList(successCallbackFn) {
-    if (successCallbackFn) {
-      this.socket.emit(SOCKET_EVENT.LIST_CLIENTS, (clientList) => {
-        successCallbackFn(clientList);
-      });
-    } else {
-      return new Promise(resolve => {
-        this.socket.emit(SOCKET_EVENT.LIST_CLIENTS, (clientList) => {
-          resolve(clientList);
-        });
-      });
-    }
-  }
-}
+const P2pMessageApi = require('./api/message');
+const P2pStreamApi = require('./api/stream.js');
 
 module.exports = function p2pClientPlugin(socket, clientId) {
-  const newApi = new NewApi(socket, clientId);
+  const p2pMessageApi = new P2pMessageApi(socket, clientId);
+  const p2pStreamApi = new P2pStreamApi(socket, p2pMessageApi);
+
   return new Proxy(socket, {
     get: (obj, prop) => {
 
-      if (prop === 'registerP2pTarget') return newApi.registerP2pTarget.bind(newApi);
-      if (prop === 'unregisterP2pTarget') return newApi.unregisterP2pTarget.bind(newApi);
-      if (prop === 'emit2' || prop === 'emitP2p') return newApi.emit2.bind(newApi);
-      if (prop === 'getClientList') return newApi.getClientList.bind(newApi);
-      if (prop === 'targetClientId') return newApi.targetClientId;
-      if (prop === 'clientId') return newApi.clientId;
+      if (prop === 'registerP2pTarget') return p2pMessageApi.registerP2pTarget.bind(p2pMessageApi);
+      if (prop === 'unregisterP2pTarget') return p2pMessageApi.unregisterP2pTarget.bind(p2pMessageApi);
+      if (prop === 'emit2' || prop === 'emitP2p') return p2pMessageApi.emit2.bind(p2pMessageApi);
+      if (prop === 'getClientList') return p2pMessageApi.getClientList.bind(p2pMessageApi);
+      if (prop === 'targetClientId') return p2pMessageApi.targetClientId;
+      if (prop === 'clientId') return p2pMessageApi.clientId;
+
+      if (prop === 'registerP2pStream') return p2pStreamApi.registerP2pStream.bind(p2pStreamApi);
+      if (prop === 'onRegisterP2pStream') return p2pStreamApi.onRegisterP2pStream.bind(p2pStreamApi);
+      if (prop === 'offRegisterP2pStream') return p2pStreamApi.offRegisterP2pStream.bind(p2pStreamApi);
 
       return obj[prop];
     }
