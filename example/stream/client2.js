@@ -1,5 +1,5 @@
 const sourceClientId = 'B';
-const p2pClientPlugin = require("../../p2p-client-plugin");
+const p2pClientPlugin = require("../../src/p2p-client-plugin");
 const socketClient = require('socket.io-client');
 const rawSocket = socketClient.connect(`http://localhost:9000?clientId=${sourceClientId}`);
 const socket = p2pClientPlugin(rawSocket);

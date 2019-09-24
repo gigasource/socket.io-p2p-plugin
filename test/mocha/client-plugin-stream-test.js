@@ -2,9 +2,10 @@ const expect = require('expect.js');
 const {Duplex} = require('stream');
 const {startClient, generateClientIds, wait, terminateClients} = require('./common');
 const streamToArray = require('stream-to-array');
+const {SOCKET_EVENT} = require('../../src/util/constants');
 const streamify = require('stream-array');
 
-describe('stream plugin for p2p-client-plugin', function () {
+describe('stream API for p2p-client-plugin', function () {
   const numberOfClients = 4;
   let client1Id, client2Id, client3Id, client4Id;
   let client1, client2, client3, client4;
@@ -38,6 +39,16 @@ describe('stream plugin for p2p-client-plugin', function () {
       const duplex = await client1.registerP2pStream({});
       expect(duplex instanceof Duplex).to.be(true);
     });
+  });
+  describe('onRegisterP2pStream function', function () {
+    it('should remove old listeners if called more than once', function () {
+      let duplex2;
+      client2.onRegisterP2pStream({}, d => duplex2 = d);
+      client2.onRegisterP2pStream({}, d => duplex2 = d);
+      client2.onRegisterP2pStream({}, d => duplex2 = d);
+
+      expect(client2.listeners(SOCKET_EVENT.P2P_REGISTER_STREAM).length).to.be(1);
+    });
   })
   describe('the returned Duplex', function () {
     it('should listen to \'error\' event', async function () {
@@ -55,36 +66,6 @@ describe('stream plugin for p2p-client-plugin', function () {
       duplex.destroy();
       expect(duplex.destroyed).to.be(true);
     });
-    it('should be destroyed on disconnecting & unregistering (must work similarly on both ends, source & target)', async function () {
-      let duplex2, duplex4;
-      expect(await client1.registerP2pTarget(client2Id)).to.be(true);
-      expect(await client3.registerP2pTarget(client4Id)).to.be(true);
-      client2.onRegisterP2pStream({}, d => duplex2 = d);
-      client4.onRegisterP2pStream({}, d => duplex4 = d);
-      const duplex1 = await client1.registerP2pStream({});
-      const duplex3 = await client3.registerP2pStream({});
-
-      expect(duplex1.destroyed).to.be(false);
-      expect(duplex2.destroyed).to.be(false);
-      expect(duplex3.destroyed).to.be(false);
-      expect(duplex4.destroyed).to.be(false);
-
-      await client1.unregisterP2pTarget();
-
-      expect(duplex1.destroyed).to.be(true);
-      expect(duplex2.destroyed).to.be(true);
-      expect(duplex3.destroyed).to.be(false);
-      expect(duplex4.destroyed).to.be(false);
-
-      client3.disconnect();
-      await wait(200);
-
-      expect(duplex1.destroyed).to.be(true);
-      expect(duplex2.destroyed).to.be(true);
-      expect(duplex3.destroyed).to.be(true);
-      expect(duplex4.destroyed).to.be(true);
-    });
-
     it('should be able to transfer data to target client when connected', async function () {
       let duplex2;
       expect(await client1.registerP2pTarget(client2Id)).to.be(true);
@@ -121,13 +102,6 @@ describe('stream plugin for p2p-client-plugin', function () {
       process.nextTick(() => duplex1.emit('error', new Error('Test error message')));
       await result;
     });
-    it('should be destroyed on error', async function () {
-      expect(await client1.registerP2pTarget(client2Id)).to.be(true);
-      client2.onRegisterP2pStream();
-      const duplex1 = await client1.registerP2pStream({});
-      expect(duplex1.emit.bind(duplex1, 'error', new Error('test'))).to.throwError();
-      expect(duplex1.destroyed).to.be(true);
-    });
     it('should handle back pressure', async function () {
       this.timeout(20 * 1000);
       let consumer;
@@ -160,7 +134,6 @@ describe('stream plugin for p2p-client-plugin', function () {
 
       await checkInterval;
     });
-
     it('should allow both ends to register stream', async function () {
       expect(await client1.registerP2pTarget(client2Id)).to.be(true);
       client2.onRegisterP2pStream();
@@ -180,6 +153,54 @@ describe('stream plugin for p2p-client-plugin', function () {
     it('should not accumulate memory', async function () {
       // console.log(process.memoryUsage().heapUsed / 1024 / 1024); // in MBs
       //TODO: implement this, need to separate producer & consumer to test
+    });
+  });
+  describe('stream lifecycle', function () {
+    it('should be destroyed on error', async function () {
+      expect(await client1.registerP2pTarget(client2Id)).to.be(true);
+      client2.onRegisterP2pStream();
+      const duplex1 = await client1.registerP2pStream({});
+      expect(duplex1.emit.bind(duplex1, 'error', new Error('test'))).to.throwError();
+      expect(duplex1.destroyed).to.be(true);
+    });
+    it('should be destroyed on disconnecting & unregistering (must work similarly on both ends, source & target)', async function () {
+      let duplex2, duplex4;
+      expect(await client1.registerP2pTarget(client2Id)).to.be(true);
+      expect(await client3.registerP2pTarget(client4Id)).to.be(true);
+      client2.onRegisterP2pStream({}, d => duplex2 = d);
+      client4.onRegisterP2pStream({}, d => duplex4 = d);
+      const duplex1 = await client1.registerP2pStream({});
+      const duplex3 = await client3.registerP2pStream({});
+
+      expect(duplex1.destroyed).to.be(false);
+      expect(duplex2.destroyed).to.be(false);
+      expect(duplex3.destroyed).to.be(false);
+      expect(duplex4.destroyed).to.be(false);
+
+      await client1.unregisterP2pTarget();
+
+      expect(duplex1.destroyed).to.be(true);
+      expect(duplex2.destroyed).to.be(true);
+      expect(duplex3.destroyed).to.be(false);
+      expect(duplex4.destroyed).to.be(false);
+
+      client3.disconnect();
+      await wait(200);
+
+      expect(duplex1.destroyed).to.be(true);
+      expect(duplex2.destroyed).to.be(true);
+      expect(duplex3.destroyed).to.be(true);
+      expect(duplex4.destroyed).to.be(true);
+    });
+    it('a new stream should be created every time P2P_REGISTER_STREAM is fired', async function () {
+      let duplex2a, duplex2b;
+      expect(await client1.registerP2pTarget(client2Id)).to.be(true);
+      client2.onRegisterP2pStream({}, d => duplex2a = d);
+      await client1.registerP2pStream({});
+      client2.onRegisterP2pStream({}, d => duplex2b = d);
+      await client1.registerP2pStream({});
+
+      expect(duplex2a == duplex2b).to.be(false);
     });
   })
 })

@@ -175,5 +175,5 @@ test();
 
 - Control center: List all/available clients
 - Security
-- Test
 - Handle duplicated clientId/wrong param format
+- Timeouts for functions
