@@ -32,8 +32,6 @@ class P2pServerManager {
 module.exports = function p2pServerPlugin(io) {
   const p2pServerManager = new P2pServerManager();
 
-
-
   io.on('connect', (socket) => {
     const {clientId} = socket.request._query;
     p2pServerManager.addClient(clientId, socket.id);
