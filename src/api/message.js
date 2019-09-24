@@ -6,7 +6,7 @@ class P2pMessageApi {
     this.clientId = clientId;
 
     this.socket.on(SOCKET_EVENT.P2P_REGISTER, (sourceClientId, callback) => {
-      if (!this.targetClientId) {
+      if (!this.targetClientId || this.targetClientId === sourceClientId) {
         this.targetClientId = sourceClientId;
         callback(true);
       } else {

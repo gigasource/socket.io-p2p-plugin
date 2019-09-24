@@ -1,5 +1,5 @@
 const P2pMessageApi = require('./api/message');
-const P2pStreamApi = require('./api/stream.js');
+const P2pStreamApi = require('./api/stream');
 
 module.exports = function p2pClientPlugin(socket, clientId) {
   const p2pMessageApi = new P2pMessageApi(socket, clientId);

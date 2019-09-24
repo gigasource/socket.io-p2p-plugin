@@ -95,6 +95,7 @@ module.exports = function p2pServerPlugin(io) {
           }
 
           const addPostRegisterListeners = (sk) => {
+            removePostRegisterListeners(sk);
             sk.once('disconnect', disconnectListener);
             sk.once(SOCKET_EVENT.P2P_UNREGISTER, unregisterListener);
             sk.on(SOCKET_EVENT.P2P_REGISTER_STREAM, registerStreamListener);
