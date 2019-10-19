@@ -2,6 +2,8 @@ const {SOCKET_EVENT} = require('../util/constants');
 
 class P2pMessageApi {
   constructor(socket, clientId) {
+    if (!socket || !clientId) throw new Error('P2pMessageApi constructor requires 2 parameters');
+
     this.socket = socket;
     this.clientId = clientId;
 
@@ -30,6 +32,15 @@ class P2pMessageApi {
 
   unregisterP2pTarget(callback) {
     if (callback) {
+      const callbackTimeout = setTimeout(callback, 3000);
+
+      callback = new Proxy(callback, {
+        apply: (target, thisArg, args) => {
+          clearTimeout(callbackTimeout);
+          target.apply(thisArg, args);
+        }
+      });
+
       if (this.targetClientId) {
         this.socket.emit(SOCKET_EVENT.P2P_UNREGISTER, callback);
         delete this.targetClientId;
@@ -38,6 +49,15 @@ class P2pMessageApi {
       }
     } else {
       return new Promise(resolve => {
+        const resolveTimeout = setTimeout(resolve, 3000);
+
+        resolve = new Proxy(resolve, {
+          apply: (target, thisArg, args) => {
+            clearTimeout(resolveTimeout);
+            target(args);
+          }
+        });
+
         if (this.targetClientId) {
           this.socket.emit(SOCKET_EVENT.P2P_UNREGISTER, resolve);
           delete this.targetClientId;

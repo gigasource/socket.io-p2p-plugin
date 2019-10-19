@@ -21,3 +21,10 @@ io.on('testAckFromJava', (arg1, ackFn) => {
   console.log(arg1);
   ackFn(`Data returned from B: ${JSON.stringify(arg1)}`);
 });
+
+io.emit('CLIENT_SUBMIT_DEVICE_INFO', {
+  name: 'Macbook',
+  deviceTypeCode: 1,
+  locationName: 'Hanoi',
+});
+

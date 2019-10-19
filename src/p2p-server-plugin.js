@@ -40,7 +40,7 @@ module.exports = function p2pServerPlugin(io) {
       console.error(`From client with id '${p2pServerManager.findClientIdBySocketId(socket.id)}': ${err}`);
       socket.emit(SOCKET_EVENT.SERVER_ERROR, err.toString());
     }
-    const findTargetClientSocket = (targetClientId) => {
+    const findSocketByClientId = (targetClientId) => {
       const targetClientSocket = io.sockets.connected[p2pServerManager.getClientSocketId(targetClientId)];
       if (!targetClientSocket) emitError(new Error(`Could not find target client '${targetClientId}' socket`));
       return targetClientSocket;
@@ -54,16 +54,16 @@ module.exports = function p2pServerPlugin(io) {
     });
     socket.on(SOCKET_EVENT.P2P_EMIT, ({targetClientId, event, args}) => {
       if (!targetClientId) emitError(new Error('targetClientId is not set'));
-      const targetClientSocket = findTargetClientSocket(targetClientId);
+      const targetClientSocket = findSocketByClientId(targetClientId);
       if (targetClientSocket) targetClientSocket.emit(event, ...args);
     });
     socket.on(SOCKET_EVENT.P2P_EMIT_ACKNOWLEDGE, ({targetClientId, event, args}, acknowledgeFn) => {
       if (!targetClientId) emitError(new Error('targetClientId is not set'));
-      const targetClientSocket = findTargetClientSocket(targetClientId);
+      const targetClientSocket = findSocketByClientId(targetClientId);
       if (targetClientSocket) targetClientSocket.emit(event, ...args, acknowledgeFn);
     });
     socket.on(SOCKET_EVENT.P2P_REGISTER, (targetClientId, p2pRegisterCallbackFn) => {
-      let targetClientSocket = findTargetClientSocket(targetClientId);
+      let targetClientSocket = findSocketByClientId(targetClientId);
 
       if (!targetClientSocket) {
         emitError(new Error('Target client is not registered to the server'));
@@ -74,7 +74,7 @@ module.exports = function p2pServerPlugin(io) {
       targetClientSocket.emit(SOCKET_EVENT.P2P_REGISTER, clientId, registerSuccess => {
         if (registerSuccess) {
           const disconnectListener = () => {
-            targetClientSocket = findTargetClientSocket(targetClientId);
+            targetClientSocket = findSocketByClientId(targetClientId);
             if (targetClientSocket) targetClientSocket.emit(SOCKET_EVENT.P2P_DISCONNECT);
             if (socket) socket.emit(SOCKET_EVENT.P2P_DISCONNECT);
 
@@ -82,16 +82,16 @@ module.exports = function p2pServerPlugin(io) {
             removePostRegisterListeners(socket);
           };
           const unregisterListener = callback => {
-            targetClientSocket = findTargetClientSocket(targetClientId);
+            targetClientSocket = findSocketByClientId(targetClientId);
             if (targetClientSocket) targetClientSocket.emit(SOCKET_EVENT.P2P_UNREGISTER, callback);
             if (socket) socket.emit(SOCKET_EVENT.P2P_UNREGISTER, callback);
 
             removePostRegisterListeners(targetClientSocket);
             removePostRegisterListeners(socket);
           };
-          const registerStreamListener = (targetClientId, callback) => {
-            const sk = findTargetClientSocket(targetClientId);
-            if (sk) sk.emit(SOCKET_EVENT.P2P_REGISTER_STREAM, callback);
+          const registerStreamListener = (targetClientId, streamIds, callback) => {
+            const sk = findSocketByClientId(targetClientId);
+            if (sk) sk.emit(SOCKET_EVENT.P2P_REGISTER_STREAM, streamIds, callback);
           }
 
           const addPostRegisterListeners = (sk) => {
@@ -117,6 +117,66 @@ module.exports = function p2pServerPlugin(io) {
       });
     });
     socket.on(SOCKET_EVENT.LIST_CLIENTS, clientCallbackFn => clientCallbackFn(p2pServerManager.getAllClientId()));
+
+    socket.on(SOCKET_EVENT.MULTI_API_ADD_TARGET, ({sourceClientId, targetClientId}) => {
+      let sourceClientSocket = findSocketByClientId(sourceClientId);
+      let targetClientSocket = findSocketByClientId(targetClientId);
+
+      const disconnectListener = sourceId => {
+        if (targetClientSocket) targetClientSocket.emit(SOCKET_EVENT.MULTI_API_TARGET_DISCONNECT, sourceId);
+      }
+
+      const sourceDisconnectListener = disconnectListener.bind(null, sourceClientId); // If source disconnects -> notify target
+      const targetDisconnectListener = disconnectListener.bind(null, targetClientId); // If target disconnects -> notify source
+
+      if (sourceClientSocket) sourceClientSocket.once('disconnect', () => {
+        sourceDisconnectListener();
+        if (targetClientSocket) targetClientSocket.off('disconnect', targetDisconnectListener);
+      });
+
+      if (targetClientSocket) {
+        targetClientSocket.once('disconnect', () => {
+          targetDisconnectListener();
+          if (sourceClientSocket) sourceClientSocket.off('disconnect', sourceDisconnectListener);
+        });
+
+        targetClientSocket.emit(SOCKET_EVENT.MULTI_API_ADD_TARGET, sourceClientId);
+      }
+    });
+
+    socket.on(SOCKET_EVENT.MULTI_API_CREATE_STREAM, (connectionInfo, callback) => {
+      const {sourceClientId, targetClientId} = connectionInfo;
+      const sourceClientSocket = findSocketByClientId(sourceClientId);
+      const targetClientSocket = findSocketByClientId(targetClientId);
+
+      if (!targetClientSocket) {
+        callback(false);
+        return;
+      }
+
+      const disconnectListener = (socket, clientId) => {
+        if (socket) socket.emit(SOCKET_EVENT.MULTI_API_TARGET_DISCONNECT, clientId);
+      }
+
+      const sourceDisconnectListener = disconnectListener.bind(null, targetClientSocket, sourceClientId); // If source disconnects -> notify target
+      const targetDisconnectListener = disconnectListener.bind(null, sourceClientSocket, targetClientId); // If target disconnects -> notify source
+
+      if (sourceClientSocket) {
+        sourceClientSocket.once('disconnect', () => {
+          sourceDisconnectListener();
+          if (targetClientSocket) targetClientSocket.off('disconnect', targetDisconnectListener);
+        });
+      }
+
+      if (targetClientSocket) {
+        targetClientSocket.once('disconnect', () => {
+          targetDisconnectListener();
+          if (sourceClientSocket) sourceClientSocket.off('disconnect', sourceDisconnectListener);
+        });
+
+        targetClientSocket.emit(SOCKET_EVENT.MULTI_API_CREATE_STREAM, connectionInfo, callback);
+      }
+    });
   });
 
   return new Proxy(io, {

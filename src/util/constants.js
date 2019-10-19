@@ -1,4 +1,5 @@
 module.exports.SOCKET_EVENT = Object.freeze({
+  // Message API events
   P2P_EMIT: 'P2P_EMIT',
   P2P_EMIT_ACKNOWLEDGE: 'P2P_EMIT_ACKNOWLEDGE',
   P2P_REGISTER: 'P2P_REGISTER',
@@ -6,9 +7,14 @@ module.exports.SOCKET_EVENT = Object.freeze({
   P2P_DISCONNECT: 'P2P_DISCONNECT',
   LIST_CLIENTS: 'LIST_CLIENTS',
   SERVER_ERROR: 'SERVER_ERROR',
-  // Stream events
+  // Stream API events
   P2P_REGISTER_STREAM: 'P2P_REGISTER_STREAM',
   P2P_EMIT_STREAM: 'P2P_EMIT_STREAM',
+  // Multi-target Message API events
+  MULTI_API_ADD_TARGET: 'MULTI_API_ADD_TARGET',
+  MULTI_API_TARGET_DISCONNECT: 'MULTI_API_TARGET_DISCONNECT',
+  // Multi-target Stream API events
+  MULTI_API_CREATE_STREAM: 'MULTI_API_CREATE_STREAM',
 });
 
 module.exports.SERVER_CONFIG = Object.freeze({

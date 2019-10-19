@@ -1,4 +1,4 @@
-const sourceClientId = 'A';
+const sourceClientId = 'C';
 const p2pClientPlugin = require("../../src/p2p-client-plugin");
 const socketClient = require('socket.io-client');
 const rawSocket = socketClient.connect(`http://localhost:9000?clientId=${sourceClientId}`);
@@ -12,8 +12,6 @@ async function test() {
     duplex.write(`from client ${sourceClientId} to B\n`);
     duplex2.write(`from client ${sourceClientId} to D\n`);
   }, 500);
-
-  // console.log(duplex.test === duplex2.test);
 }
 
 test();
