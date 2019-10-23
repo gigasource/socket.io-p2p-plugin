@@ -1,4 +1,4 @@
-const {SOCKET_EVENT} = require('../util/constants');
+const {SOCKET_EVENT} = require('../../util/constants');
 
 class P2pMultiMessageApi {
   constructor(socket, clientId) {
@@ -14,16 +14,24 @@ class P2pMultiMessageApi {
     });
   }
 
-  //todo: add timeout
-  addP2pTarget(targetClientId) {
-    this.socket.emit(SOCKET_EVENT.MULTI_API_ADD_TARGET, {
-      sourceClientId: this.clientId,
-      targetClientId
-    });
+  addP2pTarget(targetClientId, successCallback, failureCallback) {
+    if (successCallback || failureCallback) {
+      this.socket.emit(SOCKET_EVENT.MULTI_API_ADD_TARGET, targetClientId, success => {
+        if (success && successCallback) successCallback();
+        else if (!success && failureCallback) failureCallback();
+      });
+    } else {
+      return new Promise(resolve => {
+        this.socket.emit(SOCKET_EVENT.MULTI_API_ADD_TARGET, targetClientId, success => resolve(success));
+      });
+    }
   }
 
   onAddP2pTarget(callback) {
-    this.socket.on(SOCKET_EVENT.MULTI_API_ADD_TARGET, targetClientId => callback(targetClientId));
+    this.socket.on(SOCKET_EVENT.MULTI_API_ADD_TARGET, (targetClientId, clientCallback) => {
+      clientCallback(true);
+      callback(targetClientId)
+    });
   }
 
   // socket.from('clientId').on('someEvent', () => {});

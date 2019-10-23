@@ -2,7 +2,7 @@ const expect = require('expect.js');
 const {SOCKET_EVENT} = require('../../src/util/constants');
 const {startClient, wait, terminateClients, generateClientIds} = require('./common');
 
-describe('p2p-client-plugin', function () {
+describe('Message API', function () {
   const numberOfClients = 4;
   let client1Id, client2Id, client3Id, client4Id;
 

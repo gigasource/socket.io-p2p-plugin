@@ -1,5 +1,5 @@
 const {Duplex} = require('stream');
-const {SOCKET_EVENT} = require('../util/constants');
+const {SOCKET_EVENT} = require('../../util/constants');
 const uuidv1 = require('uuid/v1');
 const _ = require('lodash');
 
@@ -10,7 +10,7 @@ class P2pMultiStreamApi {
     this.clientId = p2pMultiMessageApi.clientId;
 
     // returns false if client haven't listened on the event -> notify peer that this client is not ready
-    this.socket.on(SOCKET_EVENT.MULTI_API_CREATE_STREAM, serverCallback => serverCallback(false));
+    this.socket.on(SOCKET_EVENT.MULTI_API_CREATE_STREAM, (connectionInfo, serverCallback) => serverCallback(false));
   }
 
   addP2pStream(targetClientId, duplexOptions, successCallback, failureCallback) {
@@ -19,7 +19,7 @@ class P2pMultiStreamApi {
     const connectionInfo = {
       sourceStreamId: sourceStreamId || uuidv1(),
       targetStreamId: targetStreamId || uuidv1(),
-      sourceClientId: this.clientId,
+      // sourceClientId will be set on server
       targetClientId: targetClientId,
     };
 

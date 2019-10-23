@@ -1,9 +1,9 @@
 const expect = require('expect.js');
 const {startClient, generateClientIds, wait, terminateClients} = require('./common');
 const {SOCKET_EVENT} = require('../../src/util/constants');
-const P2pMultiApi = require('../../src/api/message-multi');
+const P2pMultiApi = require('../../src/api/client/message-multi');
 
-describe('Multi API for p2p-client-plugin', function () {
+describe('Multi Message API', function () {
   const numberOfClients = 4;
   let client1Id, client2Id, client3Id, client4Id;
   let client1, client2, client3, client4;
@@ -217,7 +217,18 @@ describe('Multi API for p2p-client-plugin', function () {
 
         setTimeout(() => {
           expect(client3.listeners(`${eventName1}-from-${client1Id}`)).to.have.length(3);
+          expect(client3.listeners(`${eventName2}-from-${client1Id}`)).to.have.length(1);
+          expect(client3.listeners(`${eventName3}-from-${client1Id}`)).to.have.length(1);
+
+          expect(client3.listeners(`${eventName1}-from-${client2Id}`)).to.have.length(3);
+          expect(client3.listeners(`${eventName2}-from-${client2Id}`)).to.have.length(1);
+          expect(client3.listeners(`${eventName3}-from-${client2Id}`)).to.have.length(1);
+
+          expect(client4.listeners(`${eventName1}-from-${client1Id}`)).to.have.length(1);
+          expect(client4.listeners(`${eventName2}-from-${client1Id}`)).to.have.length(1);
+
           expect(client4.listeners(`${eventName1}-from-${client2Id}`)).to.have.length(1);
+          expect(client4.listeners(`${eventName2}-from-${client2Id}`)).to.have.length(1);
           expect(Object.keys(client3._callbacks)).to.have.length(originalLength1 + 6);
           expect(Object.keys(client4._callbacks)).to.have.length(originalLength2 + 4);
           client1.disconnect();
@@ -225,7 +236,18 @@ describe('Multi API for p2p-client-plugin', function () {
 
         setTimeout(() => {
           expect(client3.listeners(`${eventName1}-from-${client1Id}`)).to.have.length(0);
+          expect(client3.listeners(`${eventName2}-from-${client1Id}`)).to.have.length(0);
+          expect(client3.listeners(`${eventName3}-from-${client1Id}`)).to.have.length(0);
+
+          expect(client3.listeners(`${eventName1}-from-${client2Id}`)).to.have.length(3);
+          expect(client3.listeners(`${eventName2}-from-${client2Id}`)).to.have.length(1);
+          expect(client3.listeners(`${eventName3}-from-${client2Id}`)).to.have.length(1);
+
+          expect(client4.listeners(`${eventName1}-from-${client1Id}`)).to.have.length(0);
+          expect(client4.listeners(`${eventName2}-from-${client1Id}`)).to.have.length(0);
+
           expect(client4.listeners(`${eventName1}-from-${client2Id}`)).to.have.length(1);
+          expect(client4.listeners(`${eventName2}-from-${client2Id}`)).to.have.length(1);
           expect(Object.keys(client3._callbacks)).to.have.length(originalLength1 + 3);
           expect(Object.keys(client4._callbacks)).to.have.length(originalLength2 + 2);
           client2.disconnect();
@@ -233,7 +255,18 @@ describe('Multi API for p2p-client-plugin', function () {
 
         setTimeout(() => {
           expect(client3.listeners(`${eventName1}-from-${client1Id}`)).to.have.length(0);
+          expect(client3.listeners(`${eventName2}-from-${client1Id}`)).to.have.length(0);
+          expect(client3.listeners(`${eventName3}-from-${client1Id}`)).to.have.length(0);
+
+          expect(client3.listeners(`${eventName1}-from-${client2Id}`)).to.have.length(0);
+          expect(client3.listeners(`${eventName2}-from-${client2Id}`)).to.have.length(0);
+          expect(client3.listeners(`${eventName3}-from-${client2Id}`)).to.have.length(0);
+
+          expect(client4.listeners(`${eventName1}-from-${client1Id}`)).to.have.length(0);
+          expect(client4.listeners(`${eventName2}-from-${client1Id}`)).to.have.length(0);
+
           expect(client4.listeners(`${eventName1}-from-${client2Id}`)).to.have.length(0);
+          expect(client4.listeners(`${eventName2}-from-${client2Id}`)).to.have.length(0);
           expect(Object.keys(client3._callbacks)).to.have.length(originalLength1);
           expect(Object.keys(client4._callbacks)).to.have.length(originalLength2);
           done();

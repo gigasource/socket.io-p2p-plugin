@@ -5,7 +5,7 @@ const streamToArray = require('stream-to-array');
 const {SOCKET_EVENT} = require('../../src/util/constants');
 const streamify = require('stream-array');
 
-describe('stream API for p2p-client-plugin', function () {
+describe('Stream API', function () {
   const numberOfClients = 4;
   let client1Id, client2Id, client3Id, client4Id;
   let client1, client2, client3, client4;

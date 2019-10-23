@@ -2,7 +2,7 @@ const sourceClientId = 'A';
 const p2pClientPlugin = require("../src/p2p-client-plugin");
 const socketClient = require('socket.io-client');
 const rawSocket = socketClient.connect(`http://localhost:9000?clientId=${sourceClientId}`);
-const socket = p2pClientPlugin(rawSocket);
+const socket = p2pClientPlugin(rawSocket, sourceClientId);
 
 const test = async () => {
   const connectionSuccess = await socket.registerP2pTarget('B', {});

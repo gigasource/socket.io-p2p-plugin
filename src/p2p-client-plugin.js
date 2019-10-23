@@ -1,7 +1,7 @@
-const P2pMessageApi = require('./api/message');
-const P2pStreamApi = require('./api/stream');
-const P2pMultiMessageApi = require('./api/message-multi');
-const P2pMultiStreamApi = require('./api/stream-multi');
+const P2pMessageApi = require('./api/client/message-single');
+const P2pStreamApi = require('./api/client/stream-single');
+const P2pMultiMessageApi = require('./api/client/message-multi');
+const P2pMultiStreamApi = require('./api/client/stream-multi');
 
 module.exports = function p2pClientPlugin(socket, clientId) {
   const p2pMessageApi = new P2pMessageApi(socket, clientId); // allow 1-1 connections
