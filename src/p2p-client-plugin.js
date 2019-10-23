@@ -31,6 +31,8 @@ module.exports = function p2pClientPlugin(socket, clientId) {
       if (prop === 'addP2pStream') return p2pMultiStreamApi.addP2pStream.bind(p2pMultiStreamApi);
       if (prop === 'onAddP2pStream') return p2pMultiStreamApi.onAddP2pStream.bind(p2pMultiStreamApi);
       if (prop === 'offAddP2pStream') return p2pMultiStreamApi.offAddP2pStream.bind(p2pMultiStreamApi);
+      if (prop === 'fromStream') return p2pMultiStreamApi.fromStream.bind(p2pMultiStreamApi);
+      if (prop === 'offStreamListeners') return p2pMultiStreamApi.offStreamListeners.bind(p2pMultiStreamApi);
 
       return obj[prop];
     }

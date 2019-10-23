@@ -41,8 +41,8 @@ class P2pMultiMessageApi {
   }
 
   on(event, callback) {
-    const targetId = this.currentTargetId
-    const eventName = `${event}-from-${targetId}`;
+    const targetId = this.currentTargetId;
+    const eventName = `${event}${SOCKET_EVENT.CLIENT_IDENTIFIER_PREFIX}${targetId}`; // format: event-from-client-abc123
     this.socket.on(eventName, callback);
 
     this.listenerMap[targetId] = this.listenerMap[targetId] || [];
@@ -50,10 +50,21 @@ class P2pMultiMessageApi {
   }
 
   off(event, callback) {
-    const eventName = `${event}-from-${this.currentTargetId}`;
+    const targetId = this.currentTargetId;
+    const eventName = `${event}${SOCKET_EVENT.CLIENT_IDENTIFIER_PREFIX}${targetId}`;
 
     if (callback) this.socket.off(eventName, callback);
     else this.socket.off(eventName);
+  }
+
+  // todo: add test
+  once(event, callback) {
+    const targetId = this.currentTargetId;
+    const eventName = `${event}${SOCKET_EVENT.CLIENT_IDENTIFIER_PREFIX}${targetId}`; // format: event-from-client-abc123
+    this.socket.once(eventName, callback);
+
+    this.listenerMap[targetId] = this.listenerMap[targetId] || [];
+    this.listenerMap[targetId].push(eventName);
   }
 
   emitTo(targetClientId, event, ...args) {
@@ -63,7 +74,7 @@ class P2pMultiMessageApi {
 
       this.socket.emit(SOCKET_EVENT.P2P_EMIT_ACKNOWLEDGE, {
         targetClientId,
-        event: `${event}-from-${this.clientId}`,
+        event: `${event}${SOCKET_EVENT.CLIENT_IDENTIFIER_PREFIX}${this.clientId}`,
         args,
       }, acknowledgeCallbackFn);
     }
@@ -71,7 +82,7 @@ class P2pMultiMessageApi {
     else {
       this.socket.emit(SOCKET_EVENT.P2P_EMIT, {
         targetClientId,
-        event: `${event}-from-${this.clientId}`,
+        event: `${event}${SOCKET_EVENT.CLIENT_IDENTIFIER_PREFIX}${this.clientId}`,
         args,
       });
     }

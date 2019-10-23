@@ -13,8 +13,11 @@ module.exports.SOCKET_EVENT = Object.freeze({
   // Multi-target Message API events
   MULTI_API_ADD_TARGET: 'MULTI_API_ADD_TARGET',
   MULTI_API_TARGET_DISCONNECT: 'MULTI_API_TARGET_DISCONNECT',
+  CLIENT_IDENTIFIER_PREFIX: '-from-client-',
   // Multi-target Stream API events
   MULTI_API_CREATE_STREAM: 'MULTI_API_CREATE_STREAM',
+  PEER_STREAM_DESTROYED: 'PEER_STREAM_DESTROYED',
+  STREAM_IDENTIFIER_PREFIX: '-from-stream-',
 });
 
 module.exports.SERVER_CONFIG = Object.freeze({
