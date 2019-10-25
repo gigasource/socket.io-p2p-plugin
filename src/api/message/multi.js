@@ -34,6 +34,13 @@ class P2pMultiMessageApi {
     });
   }
 
+  onAny(event, callback) {
+    this.socket.on(event, (...args) => {
+      args.shift();
+      callback(...args);
+    });
+  }
+
   // socket.from('clientId').on('someEvent', () => {});
   from(targetClientId) {
     this.currentTargetId = targetClientId;
@@ -42,11 +49,13 @@ class P2pMultiMessageApi {
 
   on(event, callback) {
     const targetId = this.currentTargetId;
-    const eventName = `${event}${SOCKET_EVENT.CLIENT_IDENTIFIER_PREFIX}${targetId}`; // format: event-from-client-abc123
-    this.socket.on(eventName, callback);
+    this.socket.on(event, (...args) => {
+      const targetClientId = args.shift();
+      if (targetClientId === targetId) callback(...args);
+    });
 
     this.listenerMap[targetId] = this.listenerMap[targetId] || [];
-    this.listenerMap[targetId].push(eventName);
+    this.listenerMap[targetId].push(event);
   }
 
   off(event, callback) {
@@ -68,13 +77,14 @@ class P2pMultiMessageApi {
   }
 
   emitTo(targetClientId, event, ...args) {
+    args.unshift(this.clientId);
     // acknowledge case
     if (typeof args[args.length - 1] === 'function') {
       const acknowledgeCallbackFn = args.pop(); // last arg is acknowledge callback function
 
       this.socket.emit(SOCKET_EVENT.P2P_EMIT_ACKNOWLEDGE, {
         targetClientId,
-        event: `${event}${SOCKET_EVENT.CLIENT_IDENTIFIER_PREFIX}${this.clientId}`,
+        event,
         args,
       }, acknowledgeCallbackFn);
     }
@@ -82,7 +92,7 @@ class P2pMultiMessageApi {
     else {
       this.socket.emit(SOCKET_EVENT.P2P_EMIT, {
         targetClientId,
-        event: `${event}${SOCKET_EVENT.CLIENT_IDENTIFIER_PREFIX}${this.clientId}`,
+        event,
         args,
       });
     }

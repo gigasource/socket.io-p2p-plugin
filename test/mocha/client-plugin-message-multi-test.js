@@ -1,7 +1,7 @@
 const expect = require('expect.js');
 const {startClient, generateClientIds, wait, terminateClients} = require('./common');
 const {SOCKET_EVENT} = require('../../src/util/constants');
-const P2pMultiApi = require('../../src/api/client/message-multi');
+const P2pMultiApi = require('../../src/api/message/multi');
 
 describe('Multi Message API', function () {
   const numberOfClients = 4;

@@ -168,7 +168,7 @@ describe('p2p-server-plugin', function () {
       it('should exist', function () {
         expect(server.getClientSocketId).to.be.a('function');
         expect(server.getAllClientId).to.be.a('function');
-        expect(server.findClientIdBySocketId).to.be.a('function');
+        expect(server.getClientIdBySocketId).to.be.a('function');
       });
 
       describe('getClientSocketId function', function () {
@@ -223,14 +223,14 @@ describe('p2p-server-plugin', function () {
           expect(idArray).to.have.length(0);
         })
       });
-      describe('findClientIdBySocketId function', function () {
+      describe('getClientIdBySocketId function', function () {
         it('should be able to return correct id of a client from a socket id', function () {
           const client1SocketId = server.getClientSocketId(client1Id);
-          const c1Id = server.findClientIdBySocketId(client1SocketId);
+          const c1Id = server.getClientIdBySocketId(client1SocketId);
           expect(c1Id).to.be(client1Id);
         });
         it('should return undefined if socket id does not exist', function () {
-          const c1Id = server.findClientIdBySocketId('socketId12345');
+          const c1Id = server.getClientIdBySocketId('socketId12345');
           expect(c1Id).to.be(undefined);
         });
       })
