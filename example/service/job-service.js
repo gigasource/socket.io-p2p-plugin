@@ -1,11 +1,11 @@
 const sourceClientId = 'job';
-const serviceName = 'job-service';
+const serviceName = 'job';
 const p2pClientPlugin = require("../../src/p2p-client-plugin");
 const socketClient = require('socket.io-client');
 const rawSocket = socketClient.connect(`http://localhost:9000?clientId=${sourceClientId}&serviceName=${serviceName}`);
-const socket = p2pClientPlugin(rawSocket, sourceClientId);
+const jobService = p2pClientPlugin(rawSocket, sourceClientId, serviceName);
 const _ = require('lodash');
-const jobRoom = {};
+const jobTopic = {};
 
 const files = [
   {
@@ -26,41 +26,39 @@ const files = [
 (() => {
   let jobId = 1;
 
-  socket.provideService('create', ({targetClientId, name, content} , callback) => {
-    const roomName = `job-${name}-${jobId}`;
-    socket.emitTo(targetClientId, name, jobId, content);
-    socket.joinTopic(roomName);
-    jobRoom[jobId] = roomName;
+  jobService._topicNameTranslator = function (topicId) {
+    return jobTopic[topicId];
+  };
+
+  jobService.provideService('create', ({targetClientId, jobName, content} , callback) => {
+    const topicName = `job-${jobName}-${jobId}`;
+    jobService.emitClient(targetClientId, 'create', {jobId, jobName, content});
+    jobService.createTopic(topicName);
+    jobTopic[jobId] = topicName;
     callback(jobId++);
+    setTimeout(() => {
+      console.log('destroy topic');
+      jobService.destroyTopic(topicName);
+    }, 10000);
   });
 
-  socket.provideService('watch', ({clientId, jobId}, callback) => {
-    const roomName = jobRoom[jobId];
+  jobService.provideService('update', ({jobId, jobStatus}) => {
+    const roomName = jobTopic[jobId];
     if (roomName) {
-      socket.subscribeClient(clientId, roomName, callback);
-      callback(true);
-    } else {
-      callback(false);
-    }
-  });
-
-  socket.provideService('update', ({jobId, jobStatus}) => {
-    const roomName = jobRoom[jobId];
-    if (roomName) {
-      socket.emitRoom(roomName, `job-${jobId}-progress`, jobStatus);
+      jobService.publishTopic(roomName, jobStatus);
       // callback(true);
     } else {
       // callback(false);
     }
   });
 
-  socket.provideService('getFileInfo', ({fileName}, callback) => {
+  jobService.provideService('getFileInfo', ({fileName}, callback) => {
     const file = _.find(files, {fileName: fileName});
     if (file) callback(file);
     else callback(null);
   });
 
-  socket.provideService('listJobs', (callback) => {
-    callback(Object.keys(jobRoom));
+  jobService.provideService('listJobs', (callback) => {
+    callback(Object.keys(jobTopic));
   });
 })();

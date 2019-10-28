@@ -5,28 +5,16 @@ const rawSocket = socketClient.connect(`http://localhost:9000?clientId=${sourceC
 const socket = p2pClientPlugin(rawSocket, sourceClientId);
 
 (() => {
-  const jobInfo = {
-    name: 'downloadFile',
-    targetClientId: 'device-1',
-    content: {
-      files: ['test.txt', 'image.png'],
-    }
-  };
-
   socket.emitService('job', 'listJobs', (jobList) => {
     jobList.forEach(jobId => {
-      const watchRequestArgs = {
-        clientId: socket.clientId,
-        jobId
-      };
-
-      socket.emitService('job', 'watch', watchRequestArgs, (success) => {
-        if (success) {
-          socket.on(`job-${jobId}-progress`, (jobStatus) => {
-            console.log(`Job ${jobId} status: ${jobStatus}`);
-          });
-        }
+      socket.subscribeTopic('job', jobId, (jobStatus) => {
+        console.log(`Job ${jobId} status: ${jobStatus}`);
       });
+
+      setTimeout(() => {
+        console.log('unsubscribe');
+        socket.unsubscribeTopic('job', jobId);
+      }, 5000);
     });
   });
 })();

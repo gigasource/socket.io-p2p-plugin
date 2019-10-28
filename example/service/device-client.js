@@ -27,9 +27,12 @@ const socket = p2pClientPlugin(rawSocket, sourceClientId);
     });
   };
 
-  socket.onService('job', 'downloadFile', (jobId, {files}) => {
-    files.forEach(file => {
-      downloadFile(file, jobId);
-    });
+  socket.onService('job', 'create', ({jobId, jobName, content}) => {
+    if (jobName === 'downloadFile') {
+      const {files} = content;
+      files.forEach(file => {
+        downloadFile(file, jobId);
+      });
+    }
   });
 })();

@@ -67,7 +67,7 @@ class P2pServerManager {
     socket.emit(SOCKET_EVENT.SERVER_ERROR, err.toString());
   }
 
-  initCoreListeners(socket, clientId) {
+  initCoreListeners(io, socket, clientId) {
     socket.on('disconnect', () => {
       this.removeClient(clientId);
     });
@@ -86,22 +86,49 @@ class P2pServerManager {
     socket.on(SOCKET_EVENT.JOIN_ROOM, (action, ...args) => {
       //todo: filter mechanism to deny access to room
       let clientId, roomName, callback;
-      if (action === SOCKET_EVENT_ACTION.PUBLISH_SERVICE) {
-        [roomName, callback] = args;
-        socket.join(roomName);
-      } else if (action === SOCKET_EVENT_ACTION.SUBSCRIBE_CLIENT) {
+
+      if (action === SOCKET_EVENT_ACTION.CLIENT_SUBSCRIBE_TOPIC) {
         [clientId, roomName, callback] = args;
         const sk = this.getSocketByClientId(clientId);
 
         if (!sk) {
-          if (callback) callback(false);
+          if (callback) callback(new Error(`Join room error: can not find socket for client ${clientId}`));
           return;
         }
 
         sk.join(roomName);
+      } else {
+        [roomName, callback] = args;
+        socket.join(roomName);
       }
 
-      if (callback) callback(true);
+      if (callback) callback();
+    });
+    socket.on(SOCKET_EVENT.LEAVE_ROOM, (action, ...args) => {
+      let clientId, roomName, callback;
+
+      if (action === SOCKET_EVENT_ACTION.CLIENT_UNSUBSCRIBE_TOPIC) {
+        [clientId, roomName, callback] = args;
+        const sk = this.getSocketByClientId(clientId);
+
+        if (!sk) {
+          if (callback) callback(new Error(`Leave room error: can not find socket for client ${clientId}`));
+          return;
+        }
+
+        sk.leave(roomName, null);
+      } else if (action === SOCKET_EVENT_ACTION.SERVICE_UNSUBSCRIBE_TOPIC) {
+        //todo: is callback needed?
+        [roomName, callback] = args;
+        io.sockets.clients(roomName).forEach(function (sk) {
+          sk.leave(roomName, null);
+        });
+      } else {
+        [roomName, callback] = args;
+        socket.leave(roomName, null);
+      }
+
+      if (callback) callback();
     });
     socket.on(SOCKET_EVENT.EMIT_ROOM, (roomName, event, ...args) => {
       //todo: filter mechanism to deny access to room
@@ -275,7 +302,7 @@ module.exports = function p2pServerPlugin(io) {
     if (serviceName) p2pServerManager.addService(serviceName, clientId, socket.id);
     else p2pServerManager.addClient(clientId, socket.id);
 
-    p2pServerManager.initCoreListeners(socket, clientId);
+    p2pServerManager.initCoreListeners(io, socket, clientId);
     p2pServerManager.initSingleApiListeners(socket, clientId);
     p2pServerManager.initMultiMessageApiListeners(socket, clientId);
     p2pServerManager.initMultiStreamApiListeners(socket, clientId);

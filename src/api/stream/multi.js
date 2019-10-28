@@ -1,7 +1,6 @@
 const {Duplex} = require('stream');
 const {SOCKET_EVENT} = require('../../util/constants');
 const uuidv1 = require('uuid/v1');
-const _ = require('lodash');
 
 class P2pMultiStreamApi {
   constructor(socket, p2pMultiMessageApi) {
@@ -51,11 +50,10 @@ class P2pMultiStreamApi {
   onAddP2pStream(duplexOptions, clientCallback) {
     this.offAddP2pStream();
     this.socket.on(SOCKET_EVENT.MULTI_API_CREATE_STREAM, (connectionInfo, serverCallback) => {
-      const newConnectionInfo = _.clone(connectionInfo);
-      [newConnectionInfo.sourceClientId, newConnectionInfo.targetClientId] = [newConnectionInfo.targetClientId, newConnectionInfo.sourceClientId];
-      [newConnectionInfo.sourceStreamId, newConnectionInfo.targetStreamId] = [newConnectionInfo.targetStreamId, newConnectionInfo.sourceStreamId];
+      [connectionInfo.sourceClientId, connectionInfo.targetClientId] = [connectionInfo.targetClientId, connectionInfo.sourceClientId];
+      [connectionInfo.sourceStreamId, connectionInfo.targetStreamId] = [connectionInfo.targetStreamId, connectionInfo.sourceStreamId];
 
-      const duplex = this.createClientStream(newConnectionInfo, this.socket, this.p2pMultiMessageApi, duplexOptions);
+      const duplex = this.createClientStream(connectionInfo, this.socket, this.p2pMultiMessageApi, duplexOptions);
       if (clientCallback) clientCallback(duplex); // return a Duplex to the calling client
       if (serverCallback) serverCallback(true); // return result to peer to create stream on the other end of the connection
     });

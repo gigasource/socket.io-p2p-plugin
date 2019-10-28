@@ -5,12 +5,16 @@ class P2pCoreApi {
     this.socket = socket;
   }
 
-  joinRoom(roomName) {
-    this.socket.emit(SOCKET_EVENT.JOIN_ROOM, roomName);
+  joinRoom(...args) {
+    this.socket.emit(SOCKET_EVENT.JOIN_ROOM, ...args);
   }
 
-  emitRoom(roomName, event, ...args) {
-    this.socket.emit(SOCKET_EVENT.EMIT_ROOM, roomName, event, ...args);
+  leaveRoom(...args) {
+    this.socket.emit(SOCKET_EVENT.LEAVE_ROOM, ...args);
+  }
+
+  emitRoom(...args) {
+    this.socket.emit(SOCKET_EVENT.EMIT_ROOM, ...args);
   }
 }
 
