@@ -15,7 +15,8 @@
     "socket.io-client": "^2.2.0"
   },
   "devDependencies": {
-    "expect.js": "^0.3.1",
+    "chai": "^4.2.0",
+    "chai-as-promised": "^7.1.1",
     "mocha": "^6.2.0",
     "stream-array": "^1.1.2",
     "stream-throttle": "^0.1.3",

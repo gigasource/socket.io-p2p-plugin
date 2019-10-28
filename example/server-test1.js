@@ -10,7 +10,3 @@ const io = socketIO.listen(httpServer, {
 });
 
 const server = p2pServerPlugin(io);
-
-// setTimeout(() => {
-//   console.log(server.getAllClientId());
-// }, 10000);

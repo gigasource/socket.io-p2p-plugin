@@ -1,6 +1,6 @@
 const expect = require('expect.js');
-const {SOCKET_EVENT} = require('../../src/util/constants');
-const {startClient, wait, terminateClients, generateClientIds} = require('./common');
+const {SOCKET_EVENT} = require('../../../src/util/constants');
+const {startClient, wait, terminateClients, generateClientIds} = require('../common');
 
 describe('p2p-server-plugin', function () {
   const numberOfClients = 3;
@@ -12,7 +12,7 @@ describe('p2p-server-plugin', function () {
   let server;
 
   beforeEach(async function () {
-    server  = require('./common').server;
+    server  = require('../common').server;
     [client1Id, client2Id, client3Id] = generateClientIds(numberOfClients);
 
     client1 = startClient(client1Id);

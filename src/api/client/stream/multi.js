@@ -1,5 +1,5 @@
 const {Duplex} = require('stream');
-const {SOCKET_EVENT} = require('../../util/constants');
+const {SOCKET_EVENT} = require('../../../util/constants');
 const uuidv1 = require('uuid/v1');
 
 class P2pMultiStreamApi {

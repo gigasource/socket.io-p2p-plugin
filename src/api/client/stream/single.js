@@ -1,5 +1,5 @@
 const {Duplex} = require('stream');
-const {SOCKET_EVENT} = require('../../util/constants');
+const {SOCKET_EVENT} = require('../../../util/constants');
 
 class P2pStreamApi {
   constructor(socket, p2pMessageApi) {

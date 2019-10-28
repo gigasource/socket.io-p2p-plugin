@@ -34,28 +34,25 @@ module.exports.wait = async (ms) => {
   await waitPromise;
 }
 
-module.exports.startClient = (clientId) => {
-  const ioClient = socketClient.connect(`http://localhost:${port}?clientId=${clientId}`);
-  return p2pClientPlugin(ioClient, clientId);
+module.exports.startClients = (numberOfClients) => {
+  const clients = [];
+
+  for (let i = 0; i < numberOfClients; i++) {
+    const clientId = uuidv1();
+    const client = socketClient.connect(`http://localhost:${port}?clientId=${clientId}`);
+    clients.push(p2pClientPlugin(client, clientId));
+  }
+
+  return clients;
 }
 
-module.exports.terminateClients = function (...clients) {
+module.exports.terminateClients = (...clients) => {
   clients.forEach(client => {
     if (client) {
       client.disconnect();
       client.destroy();
     }
   });
-}
-
-module.exports.generateClientIds = function (numberOfClients) {
-  const ids = [];
-
-  for (let i = 0; i < numberOfClients; i++) {
-    ids.push(uuidv1());
-  }
-
-  return ids;
 }
 
 before(async function () {

@@ -1,4 +1,4 @@
-const {SOCKET_EVENT, SOCKET_EVENT_ACTION} = require('../../util/constants');
+const {SOCKET_EVENT, SOCKET_EVENT_ACTION} = require('../../../util/constants');
 const flatten = require('lodash').flatten;
 
 // Note: 'topic' is equivalent to 'room'

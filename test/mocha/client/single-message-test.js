@@ -1,20 +1,17 @@
-const expect = require('expect.js');
-const {SOCKET_EVENT} = require('../../src/util/constants');
-const {startClient, wait, terminateClients, generateClientIds} = require('./common');
+const chai = require('chai');
+const chaiAsPromised = require('chai-as-promised');
+const expect = chai.expect;
+const {SOCKET_EVENT} = require('../../../src/util/constants');
+const {startClients, wait, terminateClients} = require('../common');
+chai.use(chaiAsPromised);
+chai.should();
 
 describe('Message API', function () {
   const numberOfClients = 4;
-  let client1Id, client2Id, client3Id, client4Id;
-
   let client1, client2, client3, client4;
 
   beforeEach(async function () {
-    [client1Id, client2Id, client3Id, client4Id] = generateClientIds(numberOfClients);
-
-    client1 = startClient(client1Id);
-    client2 = startClient(client2Id);
-    client3 = startClient(client3Id);
-    client4 = startClient(client4Id);
+    [client1, client2, client3, client4] = startClients(numberOfClients);
     await wait(200);
   })
 
@@ -25,17 +22,9 @@ describe('Message API', function () {
 
   describe('constructor', function () {
     it('should initialize lifecycle listeners', function () {
-      expect(client1.listeners(SOCKET_EVENT.P2P_REGISTER)).to.have.length(1);
-      expect(client1.listeners(SOCKET_EVENT.P2P_DISCONNECT)).to.have.length(1);
-      expect(client1.listeners(SOCKET_EVENT.P2P_UNREGISTER)).to.have.length(1);
-
-      expect(client2.listeners(SOCKET_EVENT.P2P_REGISTER)).to.have.length(1);
-      expect(client2.listeners(SOCKET_EVENT.P2P_DISCONNECT)).to.have.length(1);
-      expect(client2.listeners(SOCKET_EVENT.P2P_UNREGISTER)).to.have.length(1);
-
-      expect(client3.listeners(SOCKET_EVENT.P2P_REGISTER)).to.have.length(1);
-      expect(client3.listeners(SOCKET_EVENT.P2P_DISCONNECT)).to.have.length(1);
-      expect(client3.listeners(SOCKET_EVENT.P2P_UNREGISTER)).to.have.length(1);
+      expect(client1.listeners(SOCKET_EVENT.P2P_REGISTER)).to.have.lengthOf(1);
+      expect(client2.listeners(SOCKET_EVENT.P2P_REGISTER)).to.have.lengthOf(1);
+      expect(client3.listeners(SOCKET_EVENT.P2P_REGISTER)).to.have.lengthOf(1);
     });
   })
 
@@ -45,79 +34,98 @@ describe('Message API', function () {
       expect(client1.unregisterP2pTarget).to.be.a('function');
       expect(client1.emit2).to.be.a('function');
       expect(client1.emitP2p).to.be.a('function');
-      expect(client1.getClientList).to.be.a('function');
+      expect(client1.getClientList).to.be.a('function'); //todo: move to Core test
     });
 
     describe('registerP2pTarget function', function () {
-      it('should return true if connect successfully', async function () {
-        const connectionSuccess = await client1.registerP2pTarget(client3Id, {});
-        expect(connectionSuccess).to.be(true);
+      it('should return undefined if connect successfully', async function () {
+        const result = await client1.registerP2pTarget(client3.clientId);
+        expect(result).to.equal(undefined);
       });
-      it('should return false if target client ID does not exist on server', async function () {
-        const connectionSuccess = await client1.registerP2pTarget('invalidId', {});
-        expect(connectionSuccess).to.be(false);
+      it('should execute callback function if connect successfully', function (done) {
+        client1.registerP2pTarget(client3.clientId, {}, done);
       });
-      it('should return false if target client is connected to another client', async function () {
-        let connectionSuccess = await client1.registerP2pTarget(client2Id, {});
-        expect(connectionSuccess).to.be(true);
-        connectionSuccess = await client3.registerP2pTarget(client2Id, {});
-        expect(connectionSuccess).to.be(false);
+      it('should execute callback function with error if target client ID does not exist on server',  function (done) {
+        client1.registerP2pTarget('invalidId', {}, (err) => {
+          expect(err instanceof Error).to.equal(true);
+          done();
+        });
       });
-      it('should not allow registering to the source client ID', function () {
-        expect(client1.registerP2pTarget.bind(client1, client1Id)).to.throwError();
+      it('should create post-register listeners if connect successfully', async function () {
+        expect(client1.listeners(SOCKET_EVENT.P2P_DISCONNECT)).to.have.lengthOf(0);
+        expect(client1.listeners(SOCKET_EVENT.P2P_UNREGISTER)).to.have.lengthOf(0);
+
+        await client1.registerP2pTarget(client3.clientId);
+
+        expect(client1.listeners(SOCKET_EVENT.P2P_DISCONNECT)).to.have.lengthOf(1);
+        expect(client1.listeners(SOCKET_EVENT.P2P_UNREGISTER)).to.have.lengthOf(1);
       });
-      it('should throw error if clientTargetId is not empty', async function () {
-        let connectionSuccess = await client1.registerP2pTarget(client2Id);
-        expect(connectionSuccess).to.be(true);
-        expect(client1.registerP2pTarget.bind(client1, client3Id)).to.throwError();
+      it('should throw error if target client ID does not exist on server', function () {
+        return expect(client1.registerP2pTarget('invalidId')).to.be.rejected;
+      });
+      it('should throw error if target client is connected to another client', async function () {
+        await client1.registerP2pTarget(client2.clientId);
+        return expect(client3.registerP2pTarget(client2.clientId)).to.be.rejected;
+      });
+      it('should throw error if register to the source client ID', function () {
+        expect(client1.registerP2pTarget.bind(client1, client1.clientId)).to.throw();
+        expect(client1.registerP2pTarget.bind(client1, client2.clientId)).to.not.throw();
+      });
+      it('should throw error if targetClientId is not empty', async function () {
+        await client1.registerP2pTarget(client2.clientId);
+        expect(client1.registerP2pTarget.bind(client1, client4.clientId)).to.throw();
+        expect(client3.registerP2pTarget.bind(client3, client4.clientId)).to.not.throw();
       });
     })
     describe('unregisterP2pTarget function', function () {
       it('should free both clients', async function () {
-        let connectionSuccess = await client1.registerP2pTarget(client3Id, {});
-        expect(connectionSuccess).to.be(true);
-        connectionSuccess = await client2.registerP2pTarget(client3Id, {});
-        expect(connectionSuccess).to.be(false);
+        let haveError = false;
+
+        await client1.registerP2pTarget(client3.clientId);
+
+        try {
+          await client2.registerP2pTarget(client3.clientId);
+        } catch (e) {
+          haveError = true;
+        }
+
+        expect(haveError).to.equal(true);
+
         await client1.unregisterP2pTarget();
-        expect(client1.targetClientId).to.be(undefined);
-        expect(client3.targetClientId).to.be(undefined);
-        connectionSuccess = await client2.registerP2pTarget(client3Id, {});
-        expect(connectionSuccess).to.be(true);
+        expect(client1.targetClientId).to.equal(undefined);
+        expect(client3.targetClientId).to.equal(undefined);
+        await client2.registerP2pTarget(client3.clientId, {});
       });
       it('should not have any effects if source client unregistered previously', async function () {
-        let connectionSuccess = await client1.registerP2pTarget(client3Id, {});
-        expect(connectionSuccess).to.be(true);
+        await client1.registerP2pTarget(client3.clientId, {});
 
-        connectionSuccess = await client2.registerP2pTarget(client3Id, {});
-        expect(connectionSuccess).to.be(false);
+        await client2.registerP2pTarget(client3.clientId, {});
 
         await client1.unregisterP2pTarget();
 
-        connectionSuccess = await client2.registerP2pTarget(client3Id, {});
-        expect(connectionSuccess).to.be(true);
+        await client2.registerP2pTarget(client3.clientId, {});
 
-        connectionSuccess = await client1.registerP2pTarget(client4Id, {});
-        expect(connectionSuccess).to.be(true);
+        await client1.registerP2pTarget(client4.clientId, {});
 
         await client1.unregisterP2pTarget();
         client1.disconnect();
         await wait(500);
 
-        expect(client2.targetClientId).to.be(client3Id);
-        expect(client3.targetClientId).to.be(client2Id);
+        expect(client2.targetClientId).to.be(client3.clientId);
+        expect(client3.targetClientId).to.be(client2.clientId);
       })
       it('should work similarly with both clients', async function () {
-        let connectionSuccess = await client1.registerP2pTarget(client2Id, {});
+        let connectionSuccess = await client1.registerP2pTarget(client2.clientId, {});
         expect(connectionSuccess).to.be(true);
-        expect(client1.targetClientId).to.be(client2Id);
+        expect(client1.targetClientId).to.be(client2.clientId);
         expect(client2.targetClientId).to.be(client1Id);
         await client1.unregisterP2pTarget();
         expect(client1.targetClientId).to.be(undefined);
         expect(client2.targetClientId).to.be(undefined);
 
-        connectionSuccess = await client1.registerP2pTarget(client2Id, {});
+        connectionSuccess = await client1.registerP2pTarget(client2.clientId, {});
         expect(connectionSuccess).to.be(true);
-        expect(client1.targetClientId).to.be(client2Id);
+        expect(client1.targetClientId).to.be(client2.clientId);
         expect(client2.targetClientId).to.be(client1Id);
         await client2.unregisterP2pTarget();
         expect(client1.targetClientId).to.be(undefined);
@@ -168,7 +176,7 @@ describe('Message API', function () {
         await wait(500);
 
         // Start testing -------------------
-        let connectionSuccess = await client1.registerP2pTarget(client2Id);
+        let connectionSuccess = await client1.registerP2pTarget(client2.clientId);
         expect(connectionSuccess).to.be(true);
         client1.emit2(eventC1ToC2, dataC1ToC2);
         await toC2FromC1EventListener;
@@ -182,7 +190,7 @@ describe('Message API', function () {
         expect(c3Result).to.be(dataC1ToC3)
         await client1.unregisterP2pTarget();
 
-        connectionSuccess = await client3.registerP2pTarget(client2Id);
+        connectionSuccess = await client3.registerP2pTarget(client2.clientId);
         expect(connectionSuccess).to.be(true);
         client3.emit2(eventC3ToC2, dataC3ToC2);
         await toC2FromC3EventListener;
@@ -193,13 +201,13 @@ describe('Message API', function () {
         expect(client1.emit2.bind(client1, 'testEvent')).to.throwError();
       });
       it('should throw error if event is not specified', async function () {
-        const connectionSuccess = await client1.registerP2pTarget(client2Id);
+        const connectionSuccess = await client1.registerP2pTarget(client2.clientId);
         expect(connectionSuccess).to.be(true);
         expect(client1.emit2.bind(client1)).to.throwError();
       });
       describe('in no ack case', function () {
         it('should emit an event to connected client', async function () {
-          const connectionSuccess = await client1.registerP2pTarget(client2Id);
+          const connectionSuccess = await client1.registerP2pTarget(client2.clientId);
           expect(connectionSuccess).to.be(true);
 
           const event = 'testEvent';
@@ -216,7 +224,7 @@ describe('Message API', function () {
           expect(testResult).to.be(2);
         });
         it('should emit an event to connected client with arguments', async function () {
-          const connectionSuccess = await client1.registerP2pTarget(client2Id);
+          const connectionSuccess = await client1.registerP2pTarget(client2.clientId);
           expect(connectionSuccess).to.be(true);
 
           const event = 'testEvent';
@@ -243,7 +251,7 @@ describe('Message API', function () {
       })
       describe('in ack case', function () {
         it('should emit an event to connected client', async function () {
-          const connectionSuccess = await client1.registerP2pTarget(client2Id);
+          const connectionSuccess = await client1.registerP2pTarget(client2.clientId);
           expect(connectionSuccess).to.be(true);
 
           const event = 'testEvent';
@@ -266,7 +274,7 @@ describe('Message API', function () {
           expect(ack).to.be(true);
         });
         it('should emit an event to connected client with arguments', async function () {
-          const connectionSuccess = await client1.registerP2pTarget(client2Id);
+          const connectionSuccess = await client1.registerP2pTarget(client2.clientId);
           expect(connectionSuccess).to.be(true);
 
           const event = 'testEvent';
@@ -300,7 +308,7 @@ describe('Message API', function () {
           expect(testResult4).to.be('ack');
         });
         it('should execute ack function after target client receives the event', async function () {
-          const connectionSuccess = await client1.registerP2pTarget(client2Id);
+          const connectionSuccess = await client1.registerP2pTarget(client2.clientId);
           expect(connectionSuccess).to.be(true);
 
           const event = 'testEvent';
@@ -330,22 +338,22 @@ describe('Message API', function () {
 
       it('should list all connected client ids', async function () {
         let clientList = await client1.getClientList();
-        expect(clientList).to.have.length(numberOfClients);
+        expect(clientList).to.have.lengthOf(numberOfClients);
         expect(clientList).to.contain(client1Id);
-        expect(clientList).to.contain(client2Id);
-        expect(clientList).to.contain(client3Id);
+        expect(clientList).to.contain(client2.clientId);
+        expect(clientList).to.contain(client3.clientId);
         // Ensure that result should be the same with different clients
         clientList = await client2.getClientList();
-        expect(clientList).to.have.length(numberOfClients);
+        expect(clientList).to.have.lengthOf(numberOfClients);
         expect(clientList).to.contain(client1Id);
-        expect(clientList).to.contain(client2Id);
-        expect(clientList).to.contain(client3Id);
+        expect(clientList).to.contain(client2.clientId);
+        expect(clientList).to.contain(client3.clientId);
 
         clientList = await client3.getClientList();
-        expect(clientList).to.have.length(numberOfClients);
+        expect(clientList).to.have.lengthOf(numberOfClients);
         expect(clientList).to.contain(client1Id);
-        expect(clientList).to.contain(client2Id);
-        expect(clientList).to.contain(client3Id);
+        expect(clientList).to.contain(client2.clientId);
+        expect(clientList).to.contain(client3.clientId);
       })
 
       it('should show server\'s clientMap correctly ', async function () {
@@ -353,20 +361,20 @@ describe('Message API', function () {
         client1.disconnect();
         await wait(200);
         let clientList = await client3.getClientList();
-        expect(clientList).to.have.length(numberOfClients - 1);
+        expect(clientList).to.have.lengthOf(numberOfClients - 1);
 
         client2.disconnect();
         await wait(200);
         clientList = await client3.getClientList();
-        expect(clientList).to.have.length(numberOfClients - 2);
+        expect(clientList).to.have.lengthOf(numberOfClients - 2);
       })
     });
   })
   describe('created clients', function () {
     it('should be notified when their peers disconnect/unregister', async function () {
       let result1, result2;
-      const connectionSuccess12 = await client1.registerP2pTarget(client2Id);
-      const connectionSuccess34 = await client3.registerP2pTarget(client4Id);
+      const connectionSuccess12 = await client1.registerP2pTarget(client2.clientId);
+      const connectionSuccess34 = await client3.registerP2pTarget(client4.clientId);
 
       expect(connectionSuccess12).to.be(true);
       expect(connectionSuccess34).to.be(true);

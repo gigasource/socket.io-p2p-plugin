@@ -1,4 +1,4 @@
-const {SOCKET_EVENT} = require('../../util/constants');
+const {SOCKET_EVENT} = require('../../../util/constants');
 
 class P2pMultiMessageApi {
   constructor(socket, clientId) {

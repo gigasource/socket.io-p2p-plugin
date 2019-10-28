@@ -1,8 +1,8 @@
 const expect = require('expect.js');
 const {Duplex} = require('stream');
-const {startClient, generateClientIds, wait, terminateClients} = require('./common');
+const {startClient, generateClientIds, wait, terminateClients} = require('../common');
 const streamToArray = require('stream-to-array');
-const {SOCKET_EVENT} = require('../../src/util/constants');
+const {SOCKET_EVENT} = require('../../../src/util/constants');
 const streamify = require('stream-array');
 
 describe('stream API for p2p-client-plugin', function () {
