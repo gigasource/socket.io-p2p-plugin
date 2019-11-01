@@ -14,7 +14,7 @@ const socket = p2pClientPlugin(rawSocket, sourceClientId);
   };
 
   socket.emitService('job', 'create', jobInfo, (jobId) => {
-    socket.subscribeTopic('job', jobId, (jobStatus) => {
+    socket.subscribeTopic('job', `${jobId}`, (jobStatus) => {
       console.log(`Job ${jobId} status: ${jobStatus}`);
     });
   });

@@ -1,6 +1,6 @@
-const {SOCKET_EVENT} = require('../../../util/constants');
+const {SOCKET_EVENT} = require('../../util/constants');
 
-class P2pCoreApi {
+class P2pClientCoreApi {
   constructor(socket) {
     this.socket = socket;
   }
@@ -27,4 +27,4 @@ class P2pCoreApi {
   }
 }
 
-module.exports = P2pCoreApi;
+module.exports = P2pClientCoreApi;

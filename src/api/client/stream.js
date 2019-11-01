@@ -1,20 +1,20 @@
 const {Duplex} = require('stream');
-const {SOCKET_EVENT} = require('../../../util/constants');
+const {SOCKET_EVENT} = require('../../util/constants');
 const uuidv1 = require('uuid/v1');
 
-class P2pMultiStreamApi {
+class P2pClientStreamApi {
   constructor(socket, p2pMultiMessageApi) {
     this.socket = socket;
     this.p2pMultiMessageApi = p2pMultiMessageApi;
     this.clientId = p2pMultiMessageApi.clientId;
-    // todo: add test
-    this.listenerMap = {};
 
     // returns false if client haven't listened on the event -> notify peer that this client is not ready
-    this.socket.on(SOCKET_EVENT.MULTI_API_CREATE_STREAM, (connectionInfo, serverCallback) => serverCallback(false));
+    this.socket.on(SOCKET_EVENT.MULTI_API_CREATE_STREAM, (connectionInfo, serverCallback) => {
+      serverCallback(new Error('Client is not listening to create stream event'));
+    });
   }
 
-  addP2pStream(targetClientId, duplexOptions, successCallback, failureCallback) {
+  addP2pStream(targetClientId, duplexOptions, callback) {
     const {sourceStreamId, targetStreamId, ...duplexOpts} = duplexOptions;
 
     const connectionInfo = {
@@ -24,24 +24,23 @@ class P2pMultiStreamApi {
       targetClientId: targetClientId,
     };
 
-    if (successCallback || failureCallback) {
-      this.socket.emit(SOCKET_EVENT.MULTI_API_CREATE_STREAM, connectionInfo, success => {
-        if (success) {
-          const duplex = this.createClientStream(connectionInfo, this.socket, this.p2pMultiMessageApi, duplexOpts);
-          if (successCallback) successCallback(duplex);
-        } else {
-          if (failureCallback) failureCallback();
+    if (callback) {
+      this.socket.emit(SOCKET_EVENT.MULTI_API_CREATE_STREAM, connectionInfo, (err) => {
+        if (err) {
+          callback(new Error('Client is not listening to create stream event'));
+          return;
         }
+
+        const duplex = this.createClientStream(connectionInfo, this.socket, this.p2pMultiMessageApi, duplexOpts);
+        callback(duplex);
       });
     } else {
-      return new Promise(resolve => {
-        this.socket.emit(SOCKET_EVENT.MULTI_API_CREATE_STREAM, connectionInfo, success => {
-          if (success) {
-            const duplex = this.createClientStream(connectionInfo, this.socket, this.p2pMultiMessageApi, duplexOpts);
-            resolve(duplex);
-          } else {
-            resolve(null);
-          }
+      return new Promise((resolve, reject) => {
+        this.socket.emit(SOCKET_EVENT.MULTI_API_CREATE_STREAM, connectionInfo, (err) => {
+          if (err) return reject(new Error('Client is not listening to create stream event'));
+
+          const duplex = this.createClientStream(connectionInfo, this.socket, this.p2pMultiMessageApi, duplexOpts);
+          resolve(duplex);
         });
       });
     }
@@ -55,56 +54,12 @@ class P2pMultiStreamApi {
 
       const duplex = this.createClientStream(connectionInfo, this.socket, this.p2pMultiMessageApi, duplexOptions);
       if (clientCallback) clientCallback(duplex); // return a Duplex to the calling client
-      if (serverCallback) serverCallback(true); // return result to peer to create stream on the other end of the connection
+      if (serverCallback) serverCallback(); // return result to peer to create stream on the other end of the connection
     });
   }
 
   offAddP2pStream() {
     this.socket.off(SOCKET_EVENT.MULTI_API_CREATE_STREAM);
-  }
-
-  // todo: add test
-  fromStream(targetClientId, targetStreamId) {
-    this.currentTargetClientId = targetClientId;
-    this.currentStreamId = targetStreamId;
-    return this;
-  }
-
-  // todo: add test
-  on(event, callback) {
-    const streamId = this.currentStreamId;
-    const eventName = `${event}${SOCKET_EVENT.STREAM_IDENTIFIER_PREFIX}${streamId}`; // format: event-from-stream-stream123-from-client-abc123
-    this.p2pMultiMessageApi.from(this.currentTargetClientId).on(eventName, callback);
-
-    this.listenerMap[streamId] = this.listenerMap[streamId] || [];
-    this.listenerMap[streamId].push(eventName);
-  }
-
-  // todo: add test
-  once(event, callback) {
-    const streamId = this.currentStreamId;
-    const eventName = `${event}${SOCKET_EVENT.STREAM_IDENTIFIER_PREFIX}${streamId}`; // format: event-from-stream-stream123-from-client-abc123
-    this.p2pMultiMessageApi.from(this.currentTargetClientId).once(eventName, callback);
-
-    this.listenerMap[streamId] = this.listenerMap[streamId] || [];
-    this.listenerMap[streamId].push(eventName);
-  }
-
-  // todo: add test
-  off(event, callback) {
-    const streamId = this.currentStreamId;
-    const eventName = `${event}${SOCKET_EVENT.STREAM_IDENTIFIER_PREFIX}${streamId}`;
-
-    if (callback) this.p2pMultiMessageApi.from(this.currentTargetClientId).off(eventName, callback);
-    else this.p2pMultiMessageApi.from(this.currentTargetClientId).off(eventName);
-  }
-
-  // todo: add test
-  offStreamListeners(targetStreamId) {
-    if (this.listenerMap[targetStreamId]) {
-      this.listenerMap[targetStreamId].forEach(eventName => this.socket.removeAllListeners(eventName));
-      delete this.listenerMap[targetStreamId];
-    }
   }
 
   createClientStream(connectionInfo, socket, p2pMultiMessageApi, options) {
@@ -128,7 +83,6 @@ class P2pMultiStreamApi {
       }
     }
 
-    // todo: add test
     const onTargetStreamDestroyed = targetStreamId => {
       if (duplex.targetStreamId === targetStreamId) {
         if (!duplex.destroyed) duplex.destroy();
@@ -138,7 +92,7 @@ class P2pMultiStreamApi {
     function addSocketListeners() {
       const emitEvent = `${SOCKET_EVENT.P2P_EMIT_STREAM}${SOCKET_EVENT.STREAM_IDENTIFIER_PREFIX}${targetStreamId}`;
       p2pMultiMessageApi.from(targetClientId).on(emitEvent, onReceiveStreamData);
-      p2pMultiMessageApi.from(targetClientId).on(SOCKET_EVENT.PEER_STREAM_DESTROYED, onTargetStreamDestroyed); // todo: add test
+      p2pMultiMessageApi.from(targetClientId).on(SOCKET_EVENT.PEER_STREAM_DESTROYED, onTargetStreamDestroyed);
       socket.once('disconnect', onDisconnect);
       socket.on(SOCKET_EVENT.MULTI_API_TARGET_DISCONNECT, onTargetDisconnect);
     }
@@ -146,7 +100,7 @@ class P2pMultiStreamApi {
     function removeSocketListeners() {
       const emitEvent = `${SOCKET_EVENT.P2P_EMIT_STREAM}${SOCKET_EVENT.STREAM_IDENTIFIER_PREFIX}${targetStreamId}`;
       p2pMultiMessageApi.from(targetClientId).off(emitEvent);
-      p2pMultiMessageApi.from(targetClientId).off(SOCKET_EVENT.PEER_STREAM_DESTROYED, onTargetStreamDestroyed); // todo: add test
+      p2pMultiMessageApi.from(targetClientId).off(SOCKET_EVENT.PEER_STREAM_DESTROYED, onTargetStreamDestroyed);
       socket.off('disconnect', onDisconnect);
       socket.off(SOCKET_EVENT.MULTI_API_TARGET_DISCONNECT, onTargetDisconnect);
     }
@@ -179,8 +133,7 @@ class P2pMultiStreamApi {
 
     duplex._destroy = () => {
       removeSocketListeners();
-      this.offStreamListeners(targetStreamId); // todo: add test
-      p2pMultiMessageApi.emitTo(targetClientId, SOCKET_EVENT.PEER_STREAM_DESTROYED, sourceStreamId); // todo: add test
+      p2pMultiMessageApi.emitTo(targetClientId, SOCKET_EVENT.PEER_STREAM_DESTROYED, sourceStreamId);
     };
 
     // Socket.IO events
@@ -198,4 +151,4 @@ class P2pMultiStreamApi {
   }
 }
 
-module.exports = P2pMultiStreamApi;
+module.exports = P2pClientStreamApi;

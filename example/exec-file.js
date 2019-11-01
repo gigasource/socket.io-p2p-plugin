@@ -1,6 +1,5 @@
 const childProcess = require('child_process');
 
-const serverFile = childProcess.execFileSync('node', ['server-test1.js'], {});
-const jobServiceFile = childProcess.execFileSync('node', ['./service/job-service.js'], {});
-const deviceClientFile = childProcess.execFileSync('node', ['./service/device-client.js'], {});
-const webClientFile = childProcess.execFileSync('node', ['./service/web-client.js'], {});
+setTimeout(() => childProcess.fork('./service/server.js'), 200);
+setTimeout(() => childProcess.fork('./service/device-client.js'), 400);
+setTimeout(() => childProcess.fork('./service/web-client-a.js'), 600);

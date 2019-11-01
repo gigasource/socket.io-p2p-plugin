@@ -6,8 +6,9 @@ const socket = p2pClientPlugin(rawSocket, sourceClientId);
 
 const test = () => {
   socket.onAddP2pTarget(source => {
-    socket.from(source).on('test', args => {
-      console.log(args);
+    socket.from(source).on('test', (text, cb) => {
+      console.log(text);
+      cb('from b');
       // socket.emitTo(source, 'reply', `hello from ${sourceClientId}, data = ${args}`);
     });
   });

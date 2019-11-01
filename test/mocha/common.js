@@ -11,28 +11,20 @@ let httpServer;
 let io;
 let port = SERVER_CONFIG.PORT;
 
-const startServer = () => {
-  port++; // use a new server in every run (all tests use the same server)
+module.exports.startServer = (options) => {
+  port++; // use a new server in every run (all tests in a set use the same server)
   httpServer = http.createServer((req, res) => res.end()).listen(port);
 
   io = socketIO.listen(httpServer);
-  return p2pServerPlugin(io);
+  return p2pServerPlugin(io, options);
 }
 
-const stopServer = () => {
+module.exports.stopServer = () => {
   httpServer.close();
   io.close();
 }
 
-module.exports.wait = async (ms) => {
-  const waitPromise = new Promise(resolve => {
-    setTimeout(() => {
-      resolve();
-    }, ms);
-  });
-
-  await waitPromise;
-}
+module.exports.wait = async (ms) => await new Promise(resolve => setTimeout(resolve, ms));
 
 module.exports.startClients = (numberOfClients) => {
   const clients = [];
@@ -41,6 +33,18 @@ module.exports.startClients = (numberOfClients) => {
     const clientId = uuidv1();
     const client = socketClient.connect(`http://localhost:${port}?clientId=${clientId}`);
     clients.push(p2pClientPlugin(client, clientId));
+  }
+
+  return clients;
+}
+
+module.exports.startServiceClients = (numberOfClients) => {
+  const clients = [];
+
+  for (let i = 0; i < numberOfClients; i++) {
+    const clientId = uuidv1();
+    const client = socketClient.connect(`http://localhost:${port}?clientId=${clientId}`);
+    clients.push(p2pClientPlugin(client, clientId, {isService: true}));
   }
 
   return clients;
@@ -55,10 +59,10 @@ module.exports.terminateClients = (...clients) => {
   });
 }
 
-before(async function () {
-  module.exports.server = startServer();
-});
-
-after(function () {
-  stopServer();
-});
+// before(async function () {
+//   module.exports.server = startServer();
+// });
+//
+// after(function () {
+//   stopServer();
+// });

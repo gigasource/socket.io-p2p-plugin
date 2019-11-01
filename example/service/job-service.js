@@ -2,8 +2,8 @@ const sourceClientId = 'job';
 const serviceName = 'job';
 const p2pClientPlugin = require("../../src/p2p-client-plugin");
 const socketClient = require('socket.io-client');
-const rawSocket = socketClient.connect(`http://localhost:9000?clientId=${sourceClientId}&serviceName=${serviceName}`);
-const jobService = p2pClientPlugin(rawSocket, sourceClientId, serviceName);
+const rawSocket = socketClient.connect(`http://localhost:9000?clientId=${sourceClientId}`);
+const jobService = p2pClientPlugin(rawSocket, sourceClientId, {isService: true});
 const _ = require('lodash');
 const jobTopic = {};
 

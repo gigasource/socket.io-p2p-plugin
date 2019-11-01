@@ -4,7 +4,7 @@
   "description": "",
   "main": "src/p2p-client-plugin.js",
   "scripts": {
-    "test": "./node_modules/mocha/bin/mocha test/mocha/*-test.js"
+    "test": "./node_modules/mocha/bin/mocha test/mocha/*/*-test.js"
   },
   "keywords": [],
   "author": "",
