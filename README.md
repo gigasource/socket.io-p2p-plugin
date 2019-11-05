@@ -7,7 +7,6 @@ This library consists of 2 components:
   
 In each component, the code is split into 4 APIs:
   - Core: consists of **common functions** for other APIs and **functions related to Socket.IO's basic features** such as room control (joinRoom, leaveRoom, emitRoom). 
-  socket-based APIs are currently put in Core since there are too few to put them into a new file. Consider putting socket-based APIs into a new file if there will be more APIs.
   - Message: extended functions for Socket.IO. This API focuses on **sending messages from clients to clients** without having to know the details on Socket.IO server.
   - Stream: extended functions for Socket.IO. This API focuses on **interacting with NodeJS Stream API**, sending & receiving data between clients using streams.
   - Service: extended functions for Socket.IO. This API allows server & clients to become services to **provide/consume socket-based APIs** & create **subscriber/publisher relationship** to monitor data changes.
