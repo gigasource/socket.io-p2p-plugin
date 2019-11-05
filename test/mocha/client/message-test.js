@@ -37,7 +37,7 @@ describe('Multi Message API', function () {
     });
   });
   describe('addP2pTarget function', function () {
-    it('should trigger onAddP2pTarget on peers', function (done) {
+      it('should trigger onAddP2pTarget on peers', function (done) {
       client2.onAddP2pTarget(sourceClientId => {
         expect(sourceClientId).to.equal(client1.clientId);
         done();
@@ -45,22 +45,36 @@ describe('Multi Message API', function () {
 
       client1.addP2pTarget(client2.clientId);
     });
-    it('should allow adding multiple target', function (done) {
+    it('should throw error if target is not registered to server',  function () {
+      return expect(client1.addP2pTarget('invalidId')).to.be.rejected;
+    });
+    it('should allow adding multiple targets', function (done) {
+      let result = 0;
       let i = 0;
+
+      const verify = () => {
+        if (++i === 3) {
+          expect(result).to.equal(111);
+          done();
+        }
+      }
 
       client2.onAddP2pTarget(sourceClientId => {
         expect(sourceClientId).to.equal(client1.clientId);
-        if (++i === 3) done();
+        result += 1;
+        verify();
       });
 
       client3.onAddP2pTarget(sourceClientId => {
         expect(sourceClientId).to.equal(client1.clientId);
-        if (++i === 3) done();
+        result += 10;
+        verify();
       });
 
       client4.onAddP2pTarget(sourceClientId => {
         expect(sourceClientId).to.equal(client1.clientId);
-        if (++i === 3) done();
+        result += 100;
+        verify();
       });
 
       client1.addP2pTarget(client2.clientId);
@@ -138,16 +152,20 @@ describe('Multi Message API', function () {
       client2.onAny(event, cb2);
       client2.onceAny(event, cb3);
       client2.onceAny(event, cb4);
+      expect(client2.listeners(event)).to.have.lengthOf(4);
 
       client2.offAny(event, cb1);
       client2.offAny(event, cb3);
+      expect(client2.listeners(event)).to.have.lengthOf(2);
 
       client1.emitTo(client2.clientId, event);
       await wait(50);
 
+      expect(client2.listeners(event)).to.have.lengthOf(1);
       expect(count).to.equal(2);
 
       client2.offAny(event);
+      expect(client2.listeners(event)).to.have.lengthOf(0);
       client1.emitTo(client2.clientId, event);
       await wait(50);
 
@@ -163,7 +181,7 @@ describe('Multi Message API', function () {
     it('should be able to receive data without onAddP2pTarget', function (done) {
       const dataToSend1 = 'test payload 1';
       const dataToSend2 = 'test payload 2';
-      const dataToSend3 = 'test payload 3';
+      const dataToSend3 = 12345;
       const eventName = 'testEvent';
 
       client2.from(client1.clientId).on(eventName, (data1, data2, data3) => {
@@ -179,7 +197,9 @@ describe('Multi Message API', function () {
       const dataToSend1 = 'test payload 1';
       const dataToSend2 = 'test payload 2';
       const dataToSend3 = 'test payload 3';
-      const eventName = 'testEvent';
+      const eventName1 = 'testEvent';
+      const eventName2 = 'something';
+      const eventName3 = 'another-event';
       let i = 0;
       let result1, result2, result3 = 'result';
 
@@ -190,26 +210,26 @@ describe('Multi Message API', function () {
         done();
       };
 
-      client4.from(client1.clientId).on(eventName, arg => {
+      client4.from(client1.clientId).on(eventName1, arg => {
         result1 = arg;
         if (++i === 3) verify();
       });
 
-      client4.from(client2.clientId).on(eventName, arg => {
+      client4.from(client2.clientId).on(eventName2, arg => {
         result2 = arg;
         if (++i === 3) verify();
       });
 
-      client4.from(client3.clientId).on(eventName, arg => {
+      client4.from(client3.clientId).on(eventName3, arg => {
         result3 = arg;
         if (++i === 3) verify();
       });
 
-      client3.emitTo(client4.clientId, eventName, dataToSend3);
-      client1.emitTo(client4.clientId, eventName, dataToSend1);
-      client2.emitTo(client4.clientId, eventName, dataToSend2);
+      client3.emitTo(client4.clientId, eventName3, dataToSend3);
+      client1.emitTo(client4.clientId, eventName1, dataToSend1);
+      client2.emitTo(client4.clientId, eventName2, dataToSend2);
     });
-  })
+  });
   describe('off function', function () {
     describe('without callback parameter', function () {
       it('should remove event listeners of selected target only', function () {
@@ -245,7 +265,9 @@ describe('Multi Message API', function () {
 
         expect(client1.listeners(event1)).to.have.lengthOf(2);
         expect(client1.listeners(event2)).to.have.lengthOf(1);
+
         client1.from(client2.clientId).off(event1, listener1);
+
         expect(client1.listeners(event1)).to.have.lengthOf(1);
         expect(client1.listeners(event2)).to.have.lengthOf(1);
         // wrong listener -> should remove nothing
@@ -256,7 +278,9 @@ describe('Multi Message API', function () {
         // ----------
         expect(client1.listeners(event1)).to.have.lengthOf(1);
         expect(client1.listeners(event2)).to.have.lengthOf(1);
+
         client1.from(client3.clientId).off(event1, listener2);
+
         expect(client1.listeners(event1)).to.have.lengthOf(0);
         expect(client1.listeners(event2)).to.have.lengthOf(1);
       });
@@ -316,7 +340,7 @@ describe('Multi Message API', function () {
         expect(result1).to.equal(payload);
         expect(result2).to.equal(ackPayload);
         done();
-      })
+      });
     });
   })
 

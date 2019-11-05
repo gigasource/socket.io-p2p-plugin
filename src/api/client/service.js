@@ -96,12 +96,10 @@ class P2pServiceApi {
   }
 
   subscribeTopic(service, topicName, callback) {
-    if (!service || !topicName || !callback) throw new Error('3 truthy parameter are required');
-    if (typeof service !== 'string' || typeof topicName !== 'string') throw new Error('service & topicName must be strings');
-
     this.emitService(service, SOCKET_EVENT.SUBSCRIBE_TOPIC, this.p2pMultiMessageApi.clientId, topicName, () => {
         topicName = modifyTopicName(service, topicName);
         if (!this.subscribedTopics.includes(topicName)) this.subscribedTopics.push(topicName);
+
         this.socket.on(`${topicName}-${SOCKET_EVENT.DEFAULT_TOPIC_EVENT}`, callback);
         this.socket.once(`${topicName}-${SOCKET_EVENT.TOPIC_BEING_DESTROYED}`, () => {
           this.socket.off(`${topicName}-${SOCKET_EVENT.DEFAULT_TOPIC_EVENT}`, callback);
@@ -110,9 +108,6 @@ class P2pServiceApi {
   }
 
   unsubscribeTopic(service, topicName) {
-    if (!service || !topicName) throw new Error('service & topicName parameter are required');
-    if (typeof service !== 'string' || typeof topicName !== 'string') throw new Error('service & topicName must be strings');
-
     topicName = modifyTopicName(service, topicName);
     if (!this.subscribedTopics.includes(topicName)) return; // throw Error is not necessary
 

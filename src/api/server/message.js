@@ -9,7 +9,7 @@ class P2pServerMessageApi {
     socket.on(SOCKET_EVENT.MULTI_API_ADD_TARGET, (targetClientId, callback) => {
       const targetClientSocket = socket.getSocketByClientId(targetClientId);
       if (!targetClientSocket) {
-        callback(false);
+        callback(`Could not find socket of client ${targetClientId}`);
         return;
       }
 

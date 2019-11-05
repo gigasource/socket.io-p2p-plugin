@@ -373,25 +373,6 @@ describe('service API for p2p-client-plugin', function () {
 
         expect(count).to.equal(1);
       });
-      it('should throw error if service or topic name is nil/not a string', async function () {
-        const topicName = 'testTopic';
-
-        client3.createTopic(topicName);
-        expect(client1.subscribeTopic.bind(client1, client3.clientId, null, () => {})).to.throw();
-        expect(client1.subscribeTopic.bind(client1, client3.clientId, {}, () => {})).to.throw();
-        expect(client1.subscribeTopic.bind(client1, client3.clientId, 1.23, () => {})).to.throw();
-        expect(client1.subscribeTopic.bind(client1, null, topicName, () => {})).to.throw();
-        expect(client1.subscribeTopic.bind(client1, {}, topicName, () => {})).to.throw();
-        expect(client1.subscribeTopic.bind(client1, 1.24, topicName, () => {})).to.throw();
-      });
-      it('should throw error if any parameter is nil', async function () {
-        const topicName = 'testTopic';
-
-        client3.createTopic(topicName);
-        expect(client1.subscribeTopic.bind(client1, null, topicName, () => {})).to.throw();
-        expect(client1.subscribeTopic.bind(client1, client3.clientId, null, () => {})).to.throw();
-        expect(client1.subscribeTopic.bind(client1, client3.clientId, topicName, null)).to.throw();
-      });
       it('should create 2 listeners for each subscribed topic (allow subscribing multiple times to a topic)', async function () {
         const topicName1 = 'testTopic';
         const topicName2 = 'another';
@@ -449,26 +430,6 @@ describe('service API for p2p-client-plugin', function () {
       });
     });
     describe('unsubscribeTopic function', function () {
-      it('should throw error if service or topic name is nil/not a string', async function () {
-        const topicName = 'testTopic';
-
-        client3.createTopic(topicName);
-        client1.subscribeTopic(client3.clientId, topicName, () => {});
-        expect(client1.unsubscribeTopic.bind(client1, client3.clientId, null)).to.throw();
-        expect(client1.unsubscribeTopic.bind(client1, client3.clientId, {})).to.throw();
-        expect(client1.unsubscribeTopic.bind(client1, client3.clientId, 123)).to.throw();
-        expect(client1.unsubscribeTopic.bind(client1, null, topicName)).to.throw();
-        expect(client1.unsubscribeTopic.bind(client1, {}, topicName)).to.throw();
-        expect(client1.unsubscribeTopic.bind(client1, 456, topicName)).to.throw();
-      });
-      it('should throw error if any parameter is nil', async function () {
-        const topicName = 'testTopic';
-
-        client3.createTopic(topicName);
-        client1.subscribeTopic(client3.clientId, topicName, () => {});
-        expect(client1.unsubscribeTopic.bind(client1, client3.clientId, null)).to.throw();
-        expect(client1.unsubscribeTopic.bind(client1, null, topicName)).to.throw();
-      });
       it('should remove listeners related to the unsubscribed topic', async function () {
         const topicName1 = 'testTopic';
         const topicName2 = 'another';
