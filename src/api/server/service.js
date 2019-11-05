@@ -12,8 +12,10 @@ class P2pServerServiceApi {
 
     /** serviceApis Example:
      [
-     'job:create': [function, function],
-     'job:update': [function],
+     'job:create': [{function}], // the 1st function is the original callback
+     'job:update': [{function, function}], // the 2nd function is the modified version of the 1st
+     // Modified callback is needed because we need to mutate the parameters passed to the original callback
+     // And to use socket.off on a specific callback, we need to store the original callback
      ]
      **/
 
@@ -68,21 +70,21 @@ class P2pServerServiceApi {
       const subscribeTopicListener = (...args) => {
         args.shift();
         let [clientId, topicName, callback] = args;
+        const socket = this.coreApi.getSocketByClientId(clientId);
 
-        if (topicName) {
-          const socket = this.coreApi.getSocketByClientId(clientId);
-
-          if (!socket) {
-            callback(new Error(`client ${clientId} is not connected to p2p server`));
-            return;
-          }
-
-          topicName = modifyTopicName(service, topicName);
-          socket.join(topicName);
-          callback();
-        } else {
-          callback(new Error('topicName can not be empty'));
+        if (!topicName) {
+          if (callback) callback('topicName can not be empty');
+          return;
         }
+
+        if (!socket) {
+          if (callback) callback(`client ${clientId} is not connected to p2p server`);
+          return;
+        }
+
+        topicName = modifyTopicName(service, topicName);
+        socket.join(topicName);
+        if (callback) callback();
       }
       this.serviceApis[subscribeApi] = [{callback: subscribeTopicListener}];
     }
@@ -90,22 +92,13 @@ class P2pServerServiceApi {
     if (!this.serviceApis[unsubscribeApi]) {
       const unsubscribeTopicListener = (...args) => {
         args.shift();
-        let [clientId, topicName, callback] = args;
+        let [clientId, topicName] = args;
+        const socket = this.coreApi.getSocketByClientId(clientId);
 
-        if (topicName) {
-          const socket = this.coreApi.getSocketByClientId(clientId);
+        if (!topicName || !socket) return;
 
-          if (!socket) {
-            callback(new Error(`client ${clientId} is not connected to p2p server`));
-            return;
-          }
-
-          topicName = modifyTopicName(service, topicName);
-          socket.leave(topicName);
-          callback();
-        } else {
-          callback(new Error('topicName can not be empty'));
-        }
+        topicName = modifyTopicName(service, topicName);
+        socket.leave(topicName);
       }
       this.serviceApis[unsubscribeApi] = [{callback: unsubscribeTopicListener}];
     }
@@ -119,7 +112,7 @@ class P2pServerServiceApi {
 
     const newCallback = new Proxy(callback, {
       apply: (target, thisArg, argArray) => {
-        argArray.shift(); // client use emitTo, which unshift the caller id to the argArray
+        argArray.shift(); // clients use emitTo, which unshift the caller id to the argArray
         return target.apply(thisArg, argArray);
       }
     });

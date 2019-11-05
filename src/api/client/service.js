@@ -16,21 +16,22 @@ class P2pServiceApi {
     this.provideService(SOCKET_EVENT.SUBSCRIBE_TOPIC, (...args) => {
       let [clientId, topicName, callback] = args;
 
-      // validity check for topicName is on client side (subscribeTopic)
-      if (topicName) {
-        topicName = modifyTopicName(this.p2pMultiMessageApi.clientId, topicName);
-        this.socket.emit(SOCKET_EVENT.JOIN_ROOM, SOCKET_EVENT_ACTION.CLIENT_SUBSCRIBE_TOPIC, clientId, topicName, callback);
-        callback();
+      if (!topicName) {
+        if (callback) callback('topicName can not be empty');
+        return;
       }
+
+      topicName = modifyTopicName(this.p2pMultiMessageApi.clientId, topicName);
+      this.socket.emit(SOCKET_EVENT.JOIN_ROOM, SOCKET_EVENT_ACTION.CLIENT_SUBSCRIBE_TOPIC, clientId, topicName, callback);
+      if (callback) callback();
     });
     this.provideService(SOCKET_EVENT.UNSUBSCRIBE_TOPIC, (...args) => {
       let [clientId, topicName] = args;
 
-      // validity check for topicName is on client side (subscribeTopic)
-      if (topicName) {
-        topicName = modifyTopicName(this.p2pMultiMessageApi.clientId, topicName);
-        this.socket.emit(SOCKET_EVENT.LEAVE_ROOM, SOCKET_EVENT_ACTION.CLIENT_UNSUBSCRIBE_TOPIC, clientId, topicName);
-      }
+      if (!topicName) return;
+
+      topicName = modifyTopicName(this.p2pMultiMessageApi.clientId, topicName);
+      this.socket.emit(SOCKET_EVENT.LEAVE_ROOM, SOCKET_EVENT_ACTION.CLIENT_UNSUBSCRIBE_TOPIC, clientId, topicName);
     });
   }
 

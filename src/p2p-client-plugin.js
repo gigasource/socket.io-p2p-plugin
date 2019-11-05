@@ -5,7 +5,7 @@ const P2pServiceApi = require('./api/client/service');
 
 // P2pServiceApi is optional -> set a parameter in options to turn the feature on
 module.exports = function p2pClientPlugin(socket, clientId, options) {
-  const p2pClientCoreApi = new P2pCoreApi(socket);
+  const p2pClientCoreApi = new P2pCoreApi(socket, clientId);
   const p2pClientMessageApi = new P2pMessageApi(socket, clientId);
   const p2pClientStreamApi = new P2pStreamApi(socket, p2pClientMessageApi);
   const p2pServiceApi = new P2pServiceApi(socket, p2pClientMessageApi);

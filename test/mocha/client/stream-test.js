@@ -3,7 +3,6 @@ const chaiAsPromised = require('chai-as-promised');
 const expect = chai.expect;
 const {Duplex} = require('stream');
 const {startServer, stopServer, startClients, wait, terminateClients} = require('../common');
-const streamToArray = require('stream-to-array');
 const {SOCKET_EVENT} = require('../../../src/util/constants');
 const streamify = require('stream-array');
 chai.use(chaiAsPromised);

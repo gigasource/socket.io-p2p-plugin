@@ -26,8 +26,6 @@ class P2pClientMessageApi {
         delete this.listenerMap[targetClientId];
       }
     });
-
-    this.socket.on(SOCKET_EVENT.SERVER_ERROR, (err) => console.error(err));
   }
 
   //TODO: add timeout
@@ -65,7 +63,6 @@ class P2pClientMessageApi {
     this.socket.on(event, newCallback);
   }
 
-  //todo: add test for listenerMapAny
   onceAny(event, callback) {
     const newCallback = (...args) => {
       args.shift();

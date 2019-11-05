@@ -1,5 +1,6 @@
-const sourceClientId = 'device-1';
-const p2pClientPlugin = require("../../src/p2p-client-plugin");
+const sourceClientId = 'mobile-device';
+const targetService = 'job-service';
+const p2pClientPlugin = require("../../../src/p2p-client-plugin");
 const socketClient = require('socket.io-client');
 const rawSocket = socketClient.connect(`http://localhost:9000?clientId=${sourceClientId}`);
 const socket = p2pClientPlugin(rawSocket, sourceClientId);
@@ -16,14 +17,18 @@ const socket = p2pClientPlugin(rawSocket, sourceClientId);
 
       const status = {
         jobId,
+        jobName: 'downloadFile',
         jobStatus: `Downloaded ${Math.round(downloaded++ / size * 100)}% of file ${fileName}`,
       };
-      socket.emitService('job', 'update', status);
+      // emitService is just another name for emitTo
+      // but it's recommended to use emitService to make the code related
+      socket.emitService(targetService, 'update', status);
       console.log(status.jobStatus);
     }, 1000);
   };
 
-  socket.onService('job', 'create', ({jobId, jobName, filesToDownload}) => {
+  // onService makes client listen to a specific service and not others
+  socket.onService(targetService, 'create', ({jobId, jobName, filesToDownload}) => {
     if (jobName === 'downloadFile') {
       filesToDownload.forEach(file => {
         downloadFile(file, jobId);

@@ -10,7 +10,7 @@ class P2pClientStreamApi {
 
     // returns false if client haven't listened on the event -> notify peer that this client is not ready
     this.socket.on(SOCKET_EVENT.MULTI_API_CREATE_STREAM, (connectionInfo, serverCallback) => {
-      serverCallback('Client is not listening to create stream event');
+      serverCallback(`Client ${this.clientId} is not listening to create stream event`);
     });
   }
 
@@ -27,7 +27,7 @@ class P2pClientStreamApi {
     if (callback) {
       this.socket.emit(SOCKET_EVENT.MULTI_API_CREATE_STREAM, connectionInfo, (err) => {
         if (err) {
-          callback(new Error('Client is not listening to create stream event'));
+          callback(err);
           return;
         }
 
@@ -37,7 +37,7 @@ class P2pClientStreamApi {
     } else {
       return new Promise((resolve, reject) => {
         this.socket.emit(SOCKET_EVENT.MULTI_API_CREATE_STREAM, connectionInfo, (err) => {
-          if (err) return reject(new Error('Client is not listening to create stream event'));
+          if (err) return reject(err);
 
           const duplex = this.createClientStream(connectionInfo, duplexOpts);
           resolve(duplex);

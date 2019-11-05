@@ -35,7 +35,7 @@ class P2pServerCoreApi {
 
   // Socket-related functions
   emitError(socket, err) {
-    console.error(`Error from client '${this.getClientIdBySocketId(socket.id)}': ${err}`);
+    console.error(`Error occurred on server: from client '${this.getClientIdBySocketId(socket.id)}': ${err}`);
     socket.emit(SOCKET_EVENT.SERVER_ERROR, err.toString());
   }
 

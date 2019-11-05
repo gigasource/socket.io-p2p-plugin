@@ -12,7 +12,7 @@ class P2pServerStreamApi {
 
       const targetClientSocket = socket.getSocketByClientId(targetClientId);
       if (!targetClientSocket) {
-        callback(false);
+        callback(`Client ${targetClientId} is not registered to server`);
         return;
       }
 
