@@ -22,6 +22,7 @@ class P2pServerMessageApi {
       socket.once('disconnect', () => {
         sourceDisconnectListener();
 
+        if (targetClientId.endsWith('-server-side')) return;
         if (!targetClientSocket) {
           this.coreApi.emitError(socket, new Error(`Could not find target client '${targetClientId}' socket`));
           return;

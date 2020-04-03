@@ -15,7 +15,7 @@ class P2pClientStreamApi {
   }
 
   addP2pStream(targetClientId, duplexOptions, callback) {
-    const {sourceStreamId, targetStreamId, ...duplexOpts} = duplexOptions;
+    const {sourceStreamId, targetStreamId, ...duplexOpts} = duplexOptions || {};
 
     const connectionInfo = {
       sourceStreamId: sourceStreamId || uuidv1(),
@@ -26,10 +26,7 @@ class P2pClientStreamApi {
 
     if (callback) {
       this.socket.emit(SOCKET_EVENT.MULTI_API_CREATE_STREAM, connectionInfo, (err) => {
-        if (err) {
-          callback(err);
-          return;
-        }
+        if (err) return callback(err);
 
         const duplex = this.createClientStream(connectionInfo, duplexOpts);
         callback(duplex);

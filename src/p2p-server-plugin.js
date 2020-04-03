@@ -8,15 +8,20 @@ module.exports = function p2pServerPlugin(io, options) {
   const p2pServerMessageApi = new P2pServerMessageApi(p2pServerCoreApi);
   const p2pServerStreamApi = new P2pServerStreamApi(p2pServerCoreApi);
   const p2pServerServiceApi = options && options.isService
-    ? new P2pServerServiceApi(p2pServerCoreApi)
-    : null;
+      ? new P2pServerServiceApi(p2pServerCoreApi)
+      : null;
 
   io.on('connect', (socket) => {
     const {clientId} = socket.request._query;
 
     socket.getSocketByClientId = (targetClientId) => {
       const targetClientSocket = p2pServerCoreApi.getSocketByClientId(targetClientId);
-      if (!targetClientSocket) p2pServerCoreApi.emitError(socket, new Error(`Could not find target client '${targetClientId}' socket`));
+
+      if (targetClientId === `${clientId}-server-side`) return socket;
+
+      if (!targetClientSocket)
+        p2pServerCoreApi.emitError(socket, new Error(`Could not find target client '${targetClientId}' socket`));
+
       return targetClientSocket;
     }
 
@@ -34,6 +39,7 @@ module.exports = function p2pServerPlugin(io, options) {
       if (prop === 'getSocketIdByClientId') return p2pServerCoreApi.getSocketIdByClientId.bind(p2pServerCoreApi);
       if (prop === 'getAllClientId') return p2pServerCoreApi.getAllClientId.bind(p2pServerCoreApi);
       if (prop === 'getClientIdBySocketId') return p2pServerCoreApi.getClientIdBySocketId.bind(p2pServerCoreApi);
+      if (prop === 'addStreamAsClient') return p2pServerStreamApi.addStreamAsClient.bind(p2pServerStreamApi);
 
       if (options && options.isService) {
         if (prop === 'asService') return p2pServerServiceApi.asService.bind(p2pServerServiceApi);

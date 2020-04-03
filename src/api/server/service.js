@@ -12,9 +12,8 @@ class P2pServerServiceApi {
 
     /** serviceApis Example:
      [
-     'job:create': [{function}], // the 1st function is the original callback
-     'job:update': [{function, function}], // the 2nd function is the modified version of the 1st
-     // Modified callback is needed because we need to mutate the parameters passed to the original callback
+     'job:update': [{function, function}], // the 2nd function is the modified version of the original handler
+     // Modified callback is needed because we need to mutate the parameters passed to the original callback (shift() the params to remove target client ID)
      // And to use socket.off on a specific callback, we need to store the original callback
      ]
      **/

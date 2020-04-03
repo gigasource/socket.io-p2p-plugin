@@ -29,8 +29,8 @@ class P2pServerCoreApi {
     return this.clientMap[clientId];
   }
 
-  getSocketByClientId(targetClientId) {
-    return this.io.sockets.connected[this.getSocketIdByClientId(targetClientId)];
+  getSocketByClientId(clientId) {
+    return this.io.sockets.connected[this.getSocketIdByClientId(clientId)];
   }
 
   // Socket-related functions
