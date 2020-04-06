@@ -15,5 +15,5 @@ const jobInfo = {
 };
 
 socket.emitService(targetService, 'create', jobInfo, (topicName) => {
-  socket.subscribeTopic(targetService, `${topicName}`, (jobStatus) => console.log(`Job ${topicName} status: ${jobStatus}`));
+  socket.subscribeTopic(targetService, `${topicName}`, (jobStatus) => console.log(`Webclient: Job ${topicName} status: ${jobStatus}`));
 });

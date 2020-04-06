@@ -32,6 +32,7 @@ module.exports = function p2pServerPlugin(io, options) {
     p2pServerMessageApi.createListeners(socket, clientId);
     p2pServerStreamApi.createListeners(socket, clientId);
     if (p2pServerServiceApi) p2pServerServiceApi.interceptP2pEmit(socket);
+    p2pServerCoreApi.ee.emit(`${clientId}@connected`);
   });
 
   return new Proxy(io, {
@@ -40,6 +41,9 @@ module.exports = function p2pServerPlugin(io, options) {
       if (prop === 'getAllClientId') return p2pServerCoreApi.getAllClientId.bind(p2pServerCoreApi);
       if (prop === 'getClientIdBySocketId') return p2pServerCoreApi.getClientIdBySocketId.bind(p2pServerCoreApi);
       if (prop === 'addStreamAsClient') return p2pServerStreamApi.addStreamAsClient.bind(p2pServerStreamApi);
+      if (prop === 'applyWhenConnect') return p2pServerCoreApi.applyWhenConnect.bind(p2pServerCoreApi);
+      if (prop === '$emit') return p2pServerCoreApi.ee.emit.bind(p2pServerCoreApi.ee);
+      if (prop === '$on') return p2pServerCoreApi.ee.on.bind(p2pServerCoreApi.ee);
 
       if (options && options.isService) {
         if (prop === 'asService') return p2pServerServiceApi.asService.bind(p2pServerServiceApi);

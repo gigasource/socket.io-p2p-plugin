@@ -1,10 +1,12 @@
 const {SOCKET_EVENT, SOCKET_EVENT_ACTION} = require('../../util/constants');
 const findKey = require('lodash/findKey');
+const EventEmitter = require('events');
 
 class P2pServerCoreApi {
   constructor(io) {
     this.clientMap = {};
     this.io = io;
+    this.ee = new EventEmitter();
   }
 
   addClient(clientId, clientSocketId) {
@@ -69,8 +71,7 @@ class P2pServerCoreApi {
         }
 
         sk.join(roomName);
-      }
-      else {
+      } else {
         [roomName, callback] = args;
         socket.join(roomName);
       }
@@ -84,8 +85,7 @@ class P2pServerCoreApi {
         [clientId, roomName] = args;
         const sk = this.getSocketByClientId(clientId);
         if (sk) sk.leave(roomName, null);
-      }
-      else if (action === SOCKET_EVENT_ACTION.SERVICE_DESTROY_TOPIC) {
+      } else if (action === SOCKET_EVENT_ACTION.SERVICE_DESTROY_TOPIC) {
         //todo: is callback needed?
         [roomName, callback] = args;
         const socketsInRoom = io.sockets.adapter.rooms[roomName].sockets;
@@ -97,8 +97,7 @@ class P2pServerCoreApi {
             sk.leave(roomName, null);
           });
         }
-      }
-      else {
+      } else {
         [roomName, callback] = args;
         socket.leave(roomName, null);
       }
@@ -113,6 +112,11 @@ class P2pServerCoreApi {
 
   initSocketBasedApis(socket) {
     socket.on(SOCKET_EVENT.LIST_CLIENTS, clientCallbackFn => clientCallbackFn(this.getAllClientId()));
+  }
+
+  applyWhenConnect(targetClientId, fn) {
+    if (this.clientMap[targetClientId]) return fn();
+    this.ee.once(`${targetClientId}@connected`, fn);
   }
 }
 
