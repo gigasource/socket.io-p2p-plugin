@@ -58,54 +58,24 @@ class P2pServerCoreApi {
     socket.on(SOCKET_EVENT.P2P_EMIT, this.p2pEmitListener);
     socket.on(SOCKET_EVENT.P2P_EMIT_ACKNOWLEDGE, this.p2pEmitAckListener);
     socket.on(SOCKET_EVENT.JOIN_ROOM, (action, ...args) => {
-      //todo: filter mechanism to deny access to room
-      let clientId, roomName, callback;
+      const excludedActions = [SOCKET_EVENT_ACTION.CLIENT_SUBSCRIBE_TOPIC, SOCKET_EVENT_ACTION.SERVICE_CREATE_TOPIC];
 
-      if (action === SOCKET_EVENT_ACTION.CLIENT_SUBSCRIBE_TOPIC) {
-        [clientId, roomName, callback] = args;
-        const sk = this.getSocketByClientId(clientId);
+      if (excludedActions.includes(action)) return;
 
-        if (!sk) {
-          if (callback) callback(new Error(`Join room error: can not find socket for client ${clientId}`));
-          return;
-        }
-
-        sk.join(roomName);
-      } else {
-        [roomName, callback] = args;
-        socket.join(roomName);
-      }
-
+      const [roomName, callback] = args;
+      socket.join(roomName);
       if (callback) callback();
     });
     socket.on(SOCKET_EVENT.LEAVE_ROOM, (action, ...args) => {
-      let clientId, roomName, callback;
+      const excludedActions = [SOCKET_EVENT_ACTION.CLIENT_UNSUBSCRIBE_TOPIC, SOCKET_EVENT_ACTION.SERVICE_DESTROY_TOPIC];
 
-      if (action === SOCKET_EVENT_ACTION.CLIENT_UNSUBSCRIBE_TOPIC) {
-        [clientId, roomName] = args;
-        const sk = this.getSocketByClientId(clientId);
-        if (sk) sk.leave(roomName, null);
-      } else if (action === SOCKET_EVENT_ACTION.SERVICE_DESTROY_TOPIC) {
-        //todo: is callback needed?
-        [roomName, callback] = args;
-        const socketsInRoom = io.sockets.adapter.rooms[roomName].sockets;
+      if (excludedActions.includes(action)) return;
 
-        if (socketsInRoom) {
-          Object.keys(socketsInRoom).forEach(key => {
-            const sk = io.sockets.connected[key];
-            sk.emit(`${roomName}-${SOCKET_EVENT.TOPIC_BEING_DESTROYED}`);
-            sk.leave(roomName, null);
-          });
-        }
-      } else {
-        [roomName, callback] = args;
-        socket.leave(roomName, null);
-      }
-
+      const [roomName, callback] = args;
+      socket.leave(roomName, null);
       if (callback) callback();
     });
     socket.on(SOCKET_EVENT.EMIT_ROOM, (roomName, event, ...args) => {
-      //todo: filter mechanism to deny access to room
       socket.to(roomName).emit(event, ...args);
     });
   }

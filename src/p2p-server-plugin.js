@@ -7,9 +7,7 @@ module.exports = function p2pServerPlugin(io, options) {
   const p2pServerCoreApi = new P2pServerCoreApi(io);
   const p2pServerMessageApi = new P2pServerMessageApi(p2pServerCoreApi);
   const p2pServerStreamApi = new P2pServerStreamApi(p2pServerCoreApi);
-  const p2pServerServiceApi = options && options.isService
-      ? new P2pServerServiceApi(p2pServerCoreApi)
-      : null;
+  const p2pServerServiceApi = new P2pServerServiceApi(p2pServerCoreApi);
 
   io.on('connect', (socket) => {
     const {clientId} = socket.request._query;
@@ -31,7 +29,8 @@ module.exports = function p2pServerPlugin(io, options) {
     p2pServerCoreApi.initSocketBasedApis(socket);
     p2pServerMessageApi.createListeners(socket, clientId);
     p2pServerStreamApi.createListeners(socket, clientId);
-    if (p2pServerServiceApi) p2pServerServiceApi.interceptP2pEmit(socket);
+    p2pServerServiceApi.createListeners(io, socket);
+    if (options && options.isService) p2pServerServiceApi.interceptP2pEmit(socket);
     p2pServerCoreApi.ee.emit(`${clientId}@connected`);
   });
 

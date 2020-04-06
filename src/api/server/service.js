@@ -1,14 +1,13 @@
-const {SOCKET_EVENT} = require('../../util/constants');
+const {SOCKET_EVENT, SOCKET_EVENT_ACTION} = require('../../util/constants');
 const flatten = require('lodash/flatten');
 const pull = require('lodash/pull');
 const reject = require('lodash/reject');
-const {modifyTopicName} = require('../../util/common');
 
 class P2pServerServiceApi {
   constructor(coreApi) {
     this.coreApi = coreApi;
     this.serviceApis = {};
-    this.createdTopics = []
+    this.createdTopics = [];
 
     /** serviceApis Example:
      [
@@ -29,6 +28,55 @@ class P2pServerServiceApi {
 
       return true;
     };
+  }
+
+  createListeners(io, socket) {
+    socket.on(SOCKET_EVENT.JOIN_ROOM, (action, ...args) => {
+      if (action === SOCKET_EVENT_ACTION.CLIENT_SUBSCRIBE_TOPIC) {
+        const [clientId, roomName, callback] = args;
+        const sk = this.coreApi.getSocketByClientId(clientId);
+
+        if (!sk) {
+          if (callback) callback(new Error(`Join room error: can not find socket for client ${clientId}`));
+          return;
+        }
+
+        sk.join(roomName);
+        if (callback) callback();
+      } else if (action === SOCKET_EVENT_ACTION.SERVICE_CREATE_TOPIC) {
+        const [topicName, callback] = args;
+
+        if (this.createdTopics.includes(topicName))
+          return callback(`Another service has registered topic with name ${topicName}, topic name must be unique`)
+        else
+          callback();
+
+        socket.join(topicName);
+        this.createdTopics.push(topicName);
+      }
+    });
+    socket.on(SOCKET_EVENT.LEAVE_ROOM, (action, ...args) => {
+      let clientId, topicName, callback;
+
+      if (action === SOCKET_EVENT_ACTION.CLIENT_UNSUBSCRIBE_TOPIC) {
+        [clientId, topicName] = args;
+        const sk = this.coreApi.getSocketByClientId(clientId);
+        if (sk) sk.leave(topicName, null);
+      } else if (action === SOCKET_EVENT_ACTION.SERVICE_DESTROY_TOPIC) {
+        [topicName, callback] = args;
+        const socketsInRoom = io.sockets.adapter.rooms[topicName].sockets;
+
+        if (socketsInRoom) {
+          Object.keys(socketsInRoom).forEach(key => {
+            const sk = io.sockets.connected[key];
+            sk.emit(`${topicName}-${SOCKET_EVENT.TOPIC_BEING_DESTROYED}`);
+            sk.leave(topicName, null);
+          });
+        }
+      }
+
+      if (callback) callback();
+    });
   }
 
   interceptP2pEmit(socket) {
@@ -81,7 +129,6 @@ class P2pServerServiceApi {
           return;
         }
 
-        topicName = modifyTopicName(service, topicName);
         socket.join(topicName);
         if (callback) callback();
       }
@@ -96,7 +143,6 @@ class P2pServerServiceApi {
 
         if (!topicName || !socket) return;
 
-        topicName = modifyTopicName(service, topicName);
         socket.leave(topicName);
       }
       this.serviceApis[unsubscribeApi] = [{callback: unsubscribeTopicListener}];
@@ -175,14 +221,13 @@ class P2pServerServiceApi {
   createTopic(...topicNames) {
     topicNames = flatten(topicNames);
     topicNames.forEach(topicName => {
-      if (!topicName || typeof topicName !== 'string') {
-        console.error(`createTopic error: a string is required for topic name, got ${topicName} instead`);
-        return;
-      }
-      if (this.createdTopics.includes(topicName)) return;
+      if (!topicName || typeof topicName !== 'string')
+        throw new Error(`createTopic error: a string is required for topic name, got ${topicName} instead`);
+
+      if (this.createdTopics.includes(topicName))
+        throw new Error(`Another service has registered topic with name ${topicName}, topic name must be unique`);
 
       this.initTopicApis(this.selectedService);
-      topicName = modifyTopicName(this.selectedService, topicName);
       this.createdTopics.push(topicName);
       this.socket.join(topicName);
     });
@@ -191,12 +236,9 @@ class P2pServerServiceApi {
   destroyTopic(...topicNames) {
     topicNames = flatten(topicNames);
     topicNames.forEach(topicName => {
-      if (!topicName || typeof topicName !== 'string') {
-        console.error(`destroyTopic error: a string is required for topic name, got ${topicName} instead`);
-        return;
-      }
+      if (!topicName || typeof topicName !== 'string')
+        throw new Error(`destroyTopic error: a string is required for topic name, got ${topicName} instead`)
 
-      topicName = modifyTopicName(this.selectedService, topicName);
       if (!this.createdTopics.includes(topicName)) return;
 
       pull(this.createdTopics, topicName);
@@ -215,7 +257,6 @@ class P2pServerServiceApi {
   publishTopic(topicName, ...args) {
     if (!topicName || typeof topicName !== 'string') throw new Error(`A string is required for topic name, got ${topicName} instead`);
 
-    topicName = modifyTopicName(this.selectedService, topicName);
     if (!this.createdTopics.includes(topicName)) throw new Error(`topic ${topicName} is not yet created`);
 
     this.coreApi.io.to(topicName).emit(`${topicName}-${SOCKET_EVENT.DEFAULT_TOPIC_EVENT}`, ...args);

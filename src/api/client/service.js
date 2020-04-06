@@ -1,14 +1,13 @@
 const {SOCKET_EVENT, SOCKET_EVENT_ACTION} = require('../../util/constants');
 const flatten = require('lodash/flatten');
 const pull = require('lodash/pull');
-const {modifyTopicName} = require('../../util/common');
 
 // Note: 'topic' is equivalent to 'room' of Socket.IO
 class P2pServiceApi {
   constructor(socket, p2pMultiMessageApi) {
     this.socket = socket;
     this.p2pMultiMessageApi = p2pMultiMessageApi;
-    this.createdTopics = []
+    this.createdTopics = [];
     this.subscribedTopics = [];
   }
 
@@ -21,7 +20,6 @@ class P2pServiceApi {
         return;
       }
 
-      topicName = modifyTopicName(this.p2pMultiMessageApi.clientId, topicName);
       this.socket.emit(SOCKET_EVENT.JOIN_ROOM, SOCKET_EVENT_ACTION.CLIENT_SUBSCRIBE_TOPIC, clientId, topicName, callback);
       if (callback) callback();
     });
@@ -30,7 +28,6 @@ class P2pServiceApi {
 
       if (!topicName) return;
 
-      topicName = modifyTopicName(this.p2pMultiMessageApi.clientId, topicName);
       this.socket.emit(SOCKET_EVENT.LEAVE_ROOM, SOCKET_EVENT_ACTION.CLIENT_UNSUBSCRIBE_TOPIC, clientId, topicName);
     });
   }
@@ -45,7 +42,7 @@ class P2pServiceApi {
 
   destroyService(api, callback) {
     this.p2pMultiMessageApi.offAny(api, callback);
-    if(!api && !callback) this.initTopicListeners(); // re-init topic listeners after clearing all APIs
+    if (!api && !callback) this.initTopicListeners(); // re-init topic listeners after clearing all APIs
   }
 
   emitClient(clientId, api, ...args) {
@@ -59,27 +56,22 @@ class P2pServiceApi {
   createTopic(...topicNames) {
     topicNames = flatten(topicNames);
     topicNames.forEach(topicName => {
-      if (!topicName || typeof topicName !== 'string') {
-        console.error(`createTopic error: a string is required for topic name, got ${topicName} instead`);
-        return;
-      }
+      if (!topicName || typeof topicName !== 'string') throw new Error(`createTopic error: a string is required for topic name, got ${topicName} instead`);
       if (this.createdTopics.includes(topicName)) return;
 
-      topicName = modifyTopicName(this.p2pMultiMessageApi.clientId, topicName);
-      this.createdTopics.push(topicName);
-      this.socket.emit(SOCKET_EVENT.JOIN_ROOM, SOCKET_EVENT_ACTION.SERVICE_CREATE_TOPIC, topicName);
+      this.socket.emit(SOCKET_EVENT.JOIN_ROOM, SOCKET_EVENT_ACTION.SERVICE_CREATE_TOPIC, topicName, error => {
+        if (error) throw new Error(error);
+
+        this.createdTopics.push(topicName);
+      });
     });
   }
 
   destroyTopic(...topicNames) {
     topicNames = flatten(topicNames);
     topicNames.forEach(topicName => {
-      if (!topicName || typeof topicName !== 'string') {
-        console.error(`destroyTopic error: a string is required for topic name, got ${topicName} instead`);
-        return;
-      }
+      if (!topicName || typeof topicName !== 'string') throw new Error(`destroyTopic error: a string is required for topic name, got ${topicName} instead`);
 
-      topicName = modifyTopicName(this.p2pMultiMessageApi.clientId, topicName);
       if (!this.createdTopics.includes(topicName)) return;
 
       pull(this.createdTopics, topicName);
@@ -90,7 +82,6 @@ class P2pServiceApi {
   publishTopic(topicName, ...args) {
     if (!topicName || typeof topicName !== 'string') throw new Error(`A string is required for topic name, got ${topicName} instead`);
 
-    topicName = modifyTopicName(this.p2pMultiMessageApi.clientId, topicName);
     if (!this.createdTopics.includes(topicName)) throw new Error(`topic ${topicName} is not yet created`);
 
     this.socket.emit(SOCKET_EVENT.EMIT_ROOM, topicName, `${topicName}-${SOCKET_EVENT.DEFAULT_TOPIC_EVENT}`, ...args);
@@ -98,18 +89,16 @@ class P2pServiceApi {
 
   subscribeTopic(service, topicName, callback) {
     this.emitService(service, SOCKET_EVENT.SUBSCRIBE_TOPIC, this.p2pMultiMessageApi.clientId, topicName, () => {
-        topicName = modifyTopicName(service, topicName);
-        if (!this.subscribedTopics.includes(topicName)) this.subscribedTopics.push(topicName);
+      if (!this.subscribedTopics.includes(topicName)) this.subscribedTopics.push(topicName);
 
-        this.socket.on(`${topicName}-${SOCKET_EVENT.DEFAULT_TOPIC_EVENT}`, callback);
-        this.socket.once(`${topicName}-${SOCKET_EVENT.TOPIC_BEING_DESTROYED}`, () => {
-          this.socket.off(`${topicName}-${SOCKET_EVENT.DEFAULT_TOPIC_EVENT}`, callback);
-        });
+      this.socket.on(`${topicName}-${SOCKET_EVENT.DEFAULT_TOPIC_EVENT}`, callback);
+      this.socket.once(`${topicName}-${SOCKET_EVENT.TOPIC_BEING_DESTROYED}`, () => {
+        this.socket.off(`${topicName}-${SOCKET_EVENT.DEFAULT_TOPIC_EVENT}`, callback);
       });
+    });
   }
 
   unsubscribeTopic(service, topicName) {
-    topicName = modifyTopicName(service, topicName);
     if (!this.subscribedTopics.includes(topicName)) return; // throw Error is not necessary
 
     pull(this.subscribedTopics, topicName);
