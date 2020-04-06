@@ -10,7 +10,7 @@ socket.emitService(targetService, 'listJobs', (jobList) => {
     socket.subscribeTopic(targetService, topicName, jobStatus => console.log(`Web-client-watcher: Job ${topicName} status: ${jobStatus}`));
 
     setTimeout(() => {
-      console.log('unsubscribe');
+      console.log('watcher unsubscribe');
       socket.unsubscribeTopic(targetService, topicName);
     }, 5000);
   });

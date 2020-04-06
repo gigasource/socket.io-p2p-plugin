@@ -7,10 +7,10 @@ const socket = p2pClientPlugin(rawSocket, sourceClientId);
 
 socket.emitService(targetService, 'listJobs', (jobList) => {
   jobList.forEach(topicName => {
-    socket.subscribeTopic(targetService, topicName, jobStatus => console.log(`Job ${topicName} status: ${jobStatus}`));
+    socket.subscribeTopic(targetService, topicName, jobStatus => console.log(`Web-client-watcher: Job ${topicName} status: ${jobStatus}`));
 
     setTimeout(() => {
-      console.log('unsubscribe');
+      console.log('watcher unsubscribe');
       socket.unsubscribeTopic(targetService, topicName);
     }, 5000);
   });
