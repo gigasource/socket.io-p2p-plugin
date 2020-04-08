@@ -13,7 +13,6 @@ const jobInfo = {
     files: ['test.txt', 'image.png'],
   }
 };
-``
 
 socket.emitService('job:create', jobInfo, topicName => {
   socket.subscribeTopic(topicName, jobStatus => console.log(`Webclient: Job ${topicName} status: ${jobStatus}`));
