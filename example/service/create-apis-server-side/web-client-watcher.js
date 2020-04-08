@@ -5,13 +5,13 @@ const socketClient = require('socket.io-client');
 const rawSocket = socketClient.connect(`http://localhost:9000?clientId=${sourceClientId}`);
 const socket = p2pClientPlugin(rawSocket, sourceClientId);
 
-socket.emitService(targetService, 'listJobs', (jobList) => {
+socket.emitService('job:list', (jobList) => {
   jobList.forEach(topicName => {
-    socket.subscribeTopic(targetService, topicName, jobStatus => console.log(`Web-client-watcher: Job ${topicName} status: ${jobStatus}`));
+    socket.subscribeTopic(topicName, jobStatus => console.log(`Web-client-watcher: Job ${topicName} status: ${jobStatus}`));
 
     setTimeout(() => {
-      console.log('unsubscribe');
-      socket.unsubscribeTopic(targetService, topicName);
+      console.log('watcher unsubscribe');
+      socket.unsubscribeTopic(topicName);
     }, 5000);
   });
 });

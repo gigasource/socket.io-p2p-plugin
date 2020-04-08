@@ -30,7 +30,7 @@ describe('Multi Message API', function () {
 
   describe('constructor', function () {
     it('should listen to MULTI_API_TARGET_DISCONNECT event', function () {
-      expect(client1.listeners(SOCKET_EVENT.MULTI_API_TARGET_DISCONNECT)).to.have.lengthOf(1);
+      expect(client1.listeners(SOCKET_EVENT.TARGET_DISCONNECT)).to.have.lengthOf(1);
     });
     it('should listen to SERVER_ERROR event', function () {
       expect(client1.listeners(SOCKET_EVENT.SERVER_ERROR)).to.have.lengthOf(1);

@@ -9,7 +9,7 @@ class P2pClientStreamApi {
     this.clientId = p2pMultiMessageApi.clientId;
 
     // returns false if client haven't listened on the event -> notify peer that this client is not ready
-    this.socket.on(SOCKET_EVENT.MULTI_API_CREATE_STREAM, (connectionInfo, serverCallback) => {
+    this.socket.on(SOCKET_EVENT.CREATE_STREAM, (connectionInfo, serverCallback) => {
       serverCallback(`Client ${this.clientId} is not listening to create stream event`);
     });
   }
@@ -25,7 +25,7 @@ class P2pClientStreamApi {
     };
 
     if (callback) {
-      this.socket.emit(SOCKET_EVENT.MULTI_API_CREATE_STREAM, connectionInfo, (err) => {
+      this.socket.emit(SOCKET_EVENT.CREATE_STREAM, connectionInfo, (err) => {
         if (err) return callback(err);
 
         const duplex = this.createClientStream(connectionInfo, duplexOpts);
@@ -33,7 +33,7 @@ class P2pClientStreamApi {
       });
     } else {
       return new Promise((resolve, reject) => {
-        this.socket.emit(SOCKET_EVENT.MULTI_API_CREATE_STREAM, connectionInfo, (err) => {
+        this.socket.emit(SOCKET_EVENT.CREATE_STREAM, connectionInfo, (err) => {
           if (err) return reject(err);
 
           const duplex = this.createClientStream(connectionInfo, duplexOpts);
@@ -45,7 +45,7 @@ class P2pClientStreamApi {
 
   onAddP2pStream(duplexOptions, clientCallback) {
     this.offAddP2pStream();
-    this.socket.on(SOCKET_EVENT.MULTI_API_CREATE_STREAM, (connectionInfo, serverCallback) => {
+    this.socket.on(SOCKET_EVENT.CREATE_STREAM, (connectionInfo, serverCallback) => {
       [connectionInfo.sourceClientId, connectionInfo.targetClientId] = [connectionInfo.targetClientId, connectionInfo.sourceClientId];
       [connectionInfo.sourceStreamId, connectionInfo.targetStreamId] = [connectionInfo.targetStreamId, connectionInfo.sourceStreamId];
 
@@ -56,7 +56,7 @@ class P2pClientStreamApi {
   }
 
   offAddP2pStream() {
-    this.socket.off(SOCKET_EVENT.MULTI_API_CREATE_STREAM);
+    this.socket.off(SOCKET_EVENT.CREATE_STREAM);
   }
 
   createClientStream(connectionInfo, options) {
@@ -99,18 +99,18 @@ class P2pClientStreamApi {
 
     const addSocketListeners = () => {
       const emitEvent = `${SOCKET_EVENT.P2P_EMIT_STREAM}${SOCKET_EVENT.STREAM_IDENTIFIER_PREFIX}${targetStreamId}`;
-      this.p2pClientMessageApi.from(targetClientId).on(emitEvent, onReceiveStreamData);
-      this.p2pClientMessageApi.from(targetClientId).on(SOCKET_EVENT.PEER_STREAM_DESTROYED, onTargetStreamDestroyed);
+      this.p2pClientMessageApi.on(emitEvent, onReceiveStreamData);
+      this.p2pClientMessageApi.on(SOCKET_EVENT.PEER_STREAM_DESTROYED, onTargetStreamDestroyed);
       this.socket.once('disconnect', onDisconnect);
-      this.socket.on(SOCKET_EVENT.MULTI_API_TARGET_DISCONNECT, onTargetDisconnect);
+      this.socket.on(SOCKET_EVENT.TARGET_DISCONNECT, onTargetDisconnect);
     }
 
     const removeSocketListeners = () => {
       const emitEvent = `${SOCKET_EVENT.P2P_EMIT_STREAM}${SOCKET_EVENT.STREAM_IDENTIFIER_PREFIX}${targetStreamId}`;
-      this.p2pClientMessageApi.from(targetClientId).off(emitEvent);
-      this.p2pClientMessageApi.from(targetClientId).off(SOCKET_EVENT.PEER_STREAM_DESTROYED, onTargetStreamDestroyed);
+      this.p2pClientMessageApi.off(emitEvent);
+      this.p2pClientMessageApi.off(SOCKET_EVENT.PEER_STREAM_DESTROYED, onTargetStreamDestroyed);
       this.socket.off('disconnect', onDisconnect);
-      this.socket.off(SOCKET_EVENT.MULTI_API_TARGET_DISCONNECT, onTargetDisconnect);
+      this.socket.off(SOCKET_EVENT.TARGET_DISCONNECT, onTargetDisconnect);
     }
 
     addSocketListeners();

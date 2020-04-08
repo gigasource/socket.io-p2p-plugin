@@ -22,13 +22,14 @@ const socket = p2pClientPlugin(rawSocket, sourceClientId);
       };
       // emitService is just another name for emitTo
       // but it's recommended to use emitService to make the code related
-      socket.emitService(targetService, 'update', status);
+      socket.emitService('job:status-update', status);
       console.log(status.jobStatus);
     }, 1000);
   };
 
   // onService makes client listen to a specific service and not others
-  socket.onService(targetService, 'create', ({jobId, jobName, filesToDownload}) => {
+  socket.on('createJob', ({jobId, jobName, filesToDownload}) => {
+    console.log('device create');
     if (jobName === 'downloadFile') {
       filesToDownload.forEach(file => {
         downloadFile(file, jobId);
