@@ -42,8 +42,8 @@ describe('p2p-server-plugin', function () {
         expect(socket.listeners(SOCKET_EVENT.JOIN_ROOM)).to.have.length(1);
         expect(socket.listeners(SOCKET_EVENT.LEAVE_ROOM)).to.have.length(1);
         expect(socket.listeners(SOCKET_EVENT.EMIT_ROOM)).to.have.length(1);
-        expect(socket.listeners(SOCKET_EVENT.MULTI_API_ADD_TARGET)).to.have.length(1);
-        expect(socket.listeners(SOCKET_EVENT.MULTI_API_CREATE_STREAM)).to.have.length(1);
+        expect(socket.listeners(SOCKET_EVENT.ADD_TARGET)).to.have.length(1);
+        expect(socket.listeners(SOCKET_EVENT.CREATE_STREAM)).to.have.length(1);
         expect(socket.listeners(SOCKET_EVENT.LIST_CLIENTS)).to.have.length(1);
       });
     });

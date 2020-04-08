@@ -14,6 +14,6 @@ const jobInfo = {
   }
 };
 
-socket.emitService(targetService, 'create', jobInfo, (topicName) => {
-  socket.subscribeTopic(targetService, `${topicName}`, (jobStatus) => console.log(`Job ${topicName} status: ${jobStatus}`));
+socket.emitService('job:create', jobInfo, topicName => {
+  socket.subscribeTopic(`${topicName}`, (jobStatus) => console.log(`Job ${topicName} status: ${jobStatus}`));
 });

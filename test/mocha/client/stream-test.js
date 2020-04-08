@@ -31,7 +31,7 @@ describe('stream API for p2p-client-plugin', function () {
 
   describe('constructor', function () {
     it('should create a MULTI_API_CREATE_STREAM to refuse connection attempt', async function () {
-      expect(client1.listeners(SOCKET_EVENT.MULTI_API_CREATE_STREAM)).to.have.lengthOf(1);
+      expect(client1.listeners(SOCKET_EVENT.CREATE_STREAM)).to.have.lengthOf(1);
     });
   })
 
@@ -49,15 +49,15 @@ describe('stream API for p2p-client-plugin', function () {
     it('should remove default listener from constructor', async function () {
       let initialListener, newListener;
 
-      expect(client2.listeners(SOCKET_EVENT.MULTI_API_CREATE_STREAM)).to.have.lengthOf(1);
-      initialListener = client2.listeners(SOCKET_EVENT.MULTI_API_CREATE_STREAM)[0];
-      newListener = client2.listeners(SOCKET_EVENT.MULTI_API_CREATE_STREAM)[0];
+      expect(client2.listeners(SOCKET_EVENT.CREATE_STREAM)).to.have.lengthOf(1);
+      initialListener = client2.listeners(SOCKET_EVENT.CREATE_STREAM)[0];
+      newListener = client2.listeners(SOCKET_EVENT.CREATE_STREAM)[0];
 
       expect(initialListener === newListener).to.equal(true);
 
       client2.onAddP2pStream({}, () => {});
-      expect(client2.listeners(SOCKET_EVENT.MULTI_API_CREATE_STREAM)).to.have.lengthOf(1);
-      newListener = client2.listeners(SOCKET_EVENT.MULTI_API_CREATE_STREAM)[0];
+      expect(client2.listeners(SOCKET_EVENT.CREATE_STREAM)).to.have.lengthOf(1);
+      newListener = client2.listeners(SOCKET_EVENT.CREATE_STREAM)[0];
 
       expect(initialListener === newListener).to.equal(false);
     });
@@ -66,7 +66,7 @@ describe('stream API for p2p-client-plugin', function () {
       client2.onAddP2pStream({}, d => {});
       client2.onAddP2pStream({}, d => {});
 
-      expect(client2.listeners(SOCKET_EVENT.MULTI_API_CREATE_STREAM).length).to.equal(1);
+      expect(client2.listeners(SOCKET_EVENT.CREATE_STREAM).length).to.equal(1);
     });
     it('should return a Duplex', function (done) {
       client2.onAddP2pStream({}, (duplex) => {
@@ -84,7 +84,7 @@ describe('stream API for p2p-client-plugin', function () {
     });
     it('should be destroyable (+ remove related listeners on destroyed)', async function () {
       const originalCount1 = client1.listeners('disconnect').length;
-      const originalCount2 = client1.listeners(SOCKET_EVENT.MULTI_API_TARGET_DISCONNECT).length;
+      const originalCount2 = client1.listeners(SOCKET_EVENT.TARGET_DISCONNECT).length;
       let sendDataEvent1, sendDataEvent2;
 
       client2.onAddP2pStream({}, d => {
@@ -96,8 +96,8 @@ describe('stream API for p2p-client-plugin', function () {
 
       expect(client1.listeners('disconnect')).to.have.lengthOf(originalCount1 + 1);
       expect(client2.listeners('disconnect')).to.have.lengthOf(originalCount1 + 1);
-      expect(client1.listeners(SOCKET_EVENT.MULTI_API_TARGET_DISCONNECT)).to.have.lengthOf(originalCount2 + 1);
-      expect(client2.listeners(SOCKET_EVENT.MULTI_API_TARGET_DISCONNECT)).to.have.lengthOf(originalCount2 + 1);
+      expect(client1.listeners(SOCKET_EVENT.TARGET_DISCONNECT)).to.have.lengthOf(originalCount2 + 1);
+      expect(client2.listeners(SOCKET_EVENT.TARGET_DISCONNECT)).to.have.lengthOf(originalCount2 + 1);
       expect(client1.listeners(sendDataEvent1)).to.have.lengthOf( 1);
       expect(client2.listeners(sendDataEvent2)).to.have.lengthOf( 1);
       expect(client1.listeners(SOCKET_EVENT.PEER_STREAM_DESTROYED)).to.have.lengthOf( 1);
@@ -110,8 +110,8 @@ describe('stream API for p2p-client-plugin', function () {
 
       expect(client1.listeners('disconnect')).to.have.lengthOf(originalCount1);
       expect(client2.listeners('disconnect')).to.have.lengthOf(originalCount1);
-      expect(client1.listeners(SOCKET_EVENT.MULTI_API_TARGET_DISCONNECT)).to.have.lengthOf(originalCount2);
-      expect(client2.listeners(SOCKET_EVENT.MULTI_API_TARGET_DISCONNECT)).to.have.lengthOf(originalCount2);
+      expect(client1.listeners(SOCKET_EVENT.TARGET_DISCONNECT)).to.have.lengthOf(originalCount2);
+      expect(client2.listeners(SOCKET_EVENT.TARGET_DISCONNECT)).to.have.lengthOf(originalCount2);
       expect(client1.listeners(sendDataEvent1)).to.have.lengthOf( 0);
       expect(client2.listeners(sendDataEvent2)).to.have.lengthOf( 0);
       expect(client1.listeners(SOCKET_EVENT.PEER_STREAM_DESTROYED)).to.have.lengthOf( 0);
@@ -283,7 +283,7 @@ describe('stream API for p2p-client-plugin', function () {
     });
     it('should remove listeners on disconnection/target disconnection', async function () {
       const originalDisconnectListenerCount = client1.listeners('disconnect').length;
-      const originalTargetDisconnectListenerCount = client1.listeners(SOCKET_EVENT.MULTI_API_TARGET_DISCONNECT).length;
+      const originalTargetDisconnectListenerCount = client1.listeners(SOCKET_EVENT.TARGET_DISCONNECT).length;
       let duplex2, duplex3, duplex4;
 
       client2.onAddP2pStream();
@@ -306,7 +306,7 @@ describe('stream API for p2p-client-plugin', function () {
       expect(client1.listeners(duplexSendDataEvent3)).to.have.lengthOf(1);
       expect(client1.listeners(duplexSendDataEvent4)).to.have.lengthOf(1);
       expect(client1.listeners('disconnect')).to.have.lengthOf(originalDisconnectListenerCount + 3);
-      expect(client1.listeners(SOCKET_EVENT.MULTI_API_TARGET_DISCONNECT)).to.have.lengthOf(originalTargetDisconnectListenerCount + 3);
+      expect(client1.listeners(SOCKET_EVENT.TARGET_DISCONNECT)).to.have.lengthOf(originalTargetDisconnectListenerCount + 3);
 
       client2.disconnect();
       await wait(50);
@@ -314,7 +314,7 @@ describe('stream API for p2p-client-plugin', function () {
       expect(client1.listeners(duplexSendDataEvent3)).to.have.lengthOf(1);
       expect(client1.listeners(duplexSendDataEvent4)).to.have.lengthOf(1);
       expect(client1.listeners('disconnect')).to.have.lengthOf(originalDisconnectListenerCount + 2);
-      expect(client1.listeners(SOCKET_EVENT.MULTI_API_TARGET_DISCONNECT)).to.have.lengthOf(originalTargetDisconnectListenerCount + 2);
+      expect(client1.listeners(SOCKET_EVENT.TARGET_DISCONNECT)).to.have.lengthOf(originalTargetDisconnectListenerCount + 2);
 
       client3.disconnect();
       await wait(50);
@@ -322,7 +322,7 @@ describe('stream API for p2p-client-plugin', function () {
       expect(client1.listeners(duplexSendDataEvent3)).to.have.lengthOf(0);
       expect(client1.listeners(duplexSendDataEvent4)).to.have.lengthOf(1);
       expect(client1.listeners('disconnect')).to.have.lengthOf(originalDisconnectListenerCount + 1);
-      expect(client1.listeners(SOCKET_EVENT.MULTI_API_TARGET_DISCONNECT)).to.have.lengthOf(originalTargetDisconnectListenerCount + 1);
+      expect(client1.listeners(SOCKET_EVENT.TARGET_DISCONNECT)).to.have.lengthOf(originalTargetDisconnectListenerCount + 1);
 
       /* client1 (active side) initializes connections to client2, 3, 4 (passive side)
          Previously, we check the disconnection of passive side by disconnecting client 2 & 3
@@ -331,8 +331,8 @@ describe('stream API for p2p-client-plugin', function () {
       */
       expect(client4.listeners(duplexSendDataEvent4OfClient4)).to.have.lengthOf(1);
       expect(client1.listeners(duplexSendDataEvent4)).to.have.lengthOf(1);
-      expect(client4.listeners(SOCKET_EVENT.MULTI_API_TARGET_DISCONNECT)).to.have.lengthOf(originalTargetDisconnectListenerCount + 1);
-      expect(client1.listeners(SOCKET_EVENT.MULTI_API_TARGET_DISCONNECT)).to.have.lengthOf(originalTargetDisconnectListenerCount + 1);
+      expect(client4.listeners(SOCKET_EVENT.TARGET_DISCONNECT)).to.have.lengthOf(originalTargetDisconnectListenerCount + 1);
+      expect(client1.listeners(SOCKET_EVENT.TARGET_DISCONNECT)).to.have.lengthOf(originalTargetDisconnectListenerCount + 1);
       expect(client4.listeners('disconnect')).to.have.lengthOf(originalDisconnectListenerCount + 1);
       expect(client1.listeners('disconnect')).to.have.lengthOf(originalDisconnectListenerCount + 1);
 
@@ -340,8 +340,8 @@ describe('stream API for p2p-client-plugin', function () {
       await wait(50);
       expect(client4.listeners(duplexSendDataEvent4OfClient4)).to.have.lengthOf(0);
       expect(client1.listeners(duplexSendDataEvent4)).to.have.lengthOf(0);
-      expect(client4.listeners(SOCKET_EVENT.MULTI_API_TARGET_DISCONNECT)).to.have.lengthOf(originalTargetDisconnectListenerCount);
-      expect(client1.listeners(SOCKET_EVENT.MULTI_API_TARGET_DISCONNECT)).to.have.lengthOf(originalTargetDisconnectListenerCount);
+      expect(client4.listeners(SOCKET_EVENT.TARGET_DISCONNECT)).to.have.lengthOf(originalTargetDisconnectListenerCount);
+      expect(client1.listeners(SOCKET_EVENT.TARGET_DISCONNECT)).to.have.lengthOf(originalTargetDisconnectListenerCount);
       expect(client4.listeners('disconnect')).to.have.lengthOf(originalDisconnectListenerCount);
       expect(client1.listeners('disconnect')).to.have.lengthOf(originalDisconnectListenerCount);
     });

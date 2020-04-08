@@ -30,7 +30,7 @@ module.exports = function p2pServerPlugin(io, options) {
     p2pServerMessageApi.createListeners(socket, clientId);
     p2pServerStreamApi.createListeners(socket, clientId);
     p2pServerServiceApi.createListeners(io, socket);
-    if (options && options.isService) p2pServerServiceApi.interceptP2pEmit(socket);
+
     p2pServerCoreApi.ee.emit(`${clientId}@connected`);
   });
 
@@ -40,16 +40,19 @@ module.exports = function p2pServerPlugin(io, options) {
       if (prop === 'getAllClientId') return p2pServerCoreApi.getAllClientId.bind(p2pServerCoreApi);
       if (prop === 'getClientIdBySocketId') return p2pServerCoreApi.getClientIdBySocketId.bind(p2pServerCoreApi);
       if (prop === 'addStreamAsClient') return p2pServerStreamApi.addStreamAsClient.bind(p2pServerStreamApi);
+
       if (prop === 'applyWhenConnect') return p2pServerCoreApi.applyWhenConnect.bind(p2pServerCoreApi);
+      if (prop === 'createTopic') return p2pServerCoreApi.createTopic.bind(p2pServerCoreApi);
+      if (prop === 'destroyTopic') return p2pServerCoreApi.destroyTopic.bind(p2pServerCoreApi);
+      if (prop === 'publishTopic') return p2pServerCoreApi.publishTopic.bind(p2pServerCoreApi);
+      if (prop === 'emitTo') return p2pServerCoreApi.emitTo.bind(p2pServerCoreApi);
       if (prop === '$emit') return p2pServerCoreApi.ee.emit.bind(p2pServerCoreApi.ee);
       if (prop === '$on') return p2pServerCoreApi.ee.on.bind(p2pServerCoreApi.ee);
 
-      if (options && options.isService) {
-        if (prop === 'asService') return p2pServerServiceApi.asService.bind(p2pServerServiceApi);
-        if (prop === 'destroyAllServices') return p2pServerServiceApi.destroyAllServices.bind(p2pServerServiceApi);
-        if (prop === 'createdTopics') return p2pServerServiceApi.createdTopics;
-        if (prop === 'serviceApis') return p2pServerServiceApi.serviceApis;
-      }
+      if (prop === 'provideService') return p2pServerServiceApi.provideService.bind(p2pServerServiceApi);
+      if (prop === 'destroyService') return p2pServerServiceApi.destroyService.bind(p2pServerServiceApi);
+      if (prop === 'destroyAllServices') return p2pServerServiceApi.destroyAllServices.bind(p2pServerServiceApi);
+      if (prop === 'serviceApis') return p2pServerServiceApi.serviceApis;
 
       return obj[prop];
     },

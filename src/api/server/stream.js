@@ -8,7 +8,7 @@ class P2pServerStreamApi {
   }
 
   createListeners(socket, clientId) {
-    socket.on(SOCKET_EVENT.MULTI_API_CREATE_STREAM, (connectionInfo, callback) => {
+    socket.on(SOCKET_EVENT.CREATE_STREAM, (connectionInfo, callback) => {
       const {targetClientId} = connectionInfo;
       connectionInfo.sourceClientId = clientId;
 
@@ -19,7 +19,7 @@ class P2pServerStreamApi {
       }
 
       const disconnectListener = (sk, clientId) => {
-        if (sk) sk.emit(SOCKET_EVENT.MULTI_API_TARGET_DISCONNECT, clientId);
+        if (sk) sk.emit(SOCKET_EVENT.TARGET_DISCONNECT, clientId);
       }
       const sourceDisconnectListener = disconnectListener.bind(null, targetClientSocket, clientId); // If source disconnects -> notify target
       const targetDisconnectListener = disconnectListener.bind(null, socket, targetClientId); // If target disconnects -> notify source
@@ -40,7 +40,7 @@ class P2pServerStreamApi {
         if (socket) socket.off('disconnect', sourceDisconnectListener);
       });
 
-      targetClientSocket.emit(SOCKET_EVENT.MULTI_API_CREATE_STREAM, connectionInfo, callback);
+      targetClientSocket.emit(SOCKET_EVENT.CREATE_STREAM, connectionInfo, callback);
     });
   }
 
@@ -58,7 +58,7 @@ class P2pServerStreamApi {
     if (callback) {
       socket.emit(SOCKET_EVENT.P2P_EMIT_ACKNOWLEDGE, {
         targetClientId,
-        event: SOCKET_EVENT.MULTI_API_CREATE_STREAM,
+        event: SOCKET_EVENT.CREATE_STREAM,
         args: connectionInfo,
       }, err => {
         if (err) return callback(err);
@@ -68,7 +68,7 @@ class P2pServerStreamApi {
       });
     } else {
       return new Promise((resolve, reject) => {
-        socket.emit(SOCKET_EVENT.MULTI_API_CREATE_STREAM, connectionInfo, err => {
+        socket.emit(SOCKET_EVENT.CREATE_STREAM, connectionInfo, err => {
           if (err) return reject(err);
 
           const duplex = new ServerSideDuplex(socket, connectionInfo, duplexOpts);
@@ -145,7 +145,7 @@ class ServerSideDuplex extends Duplex {
         case SOCKET_EVENT.PEER_STREAM_DESTROYED:
           this.onTargetStreamDestroyed(args);
           break;
-        case SOCKET_EVENT.MULTI_API_TARGET_DISCONNECT:
+        case SOCKET_EVENT.TARGET_DISCONNECT:
           this.onTargetDisconnect(args);
       }
     };

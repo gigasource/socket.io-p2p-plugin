@@ -1,110 +1,40 @@
-const {SOCKET_EVENT, SOCKET_EVENT_ACTION} = require('../../util/constants');
-const flatten = require('lodash/flatten');
-const pull = require('lodash/pull');
+const {SOCKET_EVENT} = require('../../util/constants');
 
-// Note: 'topic' is equivalent to 'room' of Socket.IO
 class P2pServiceApi {
-  constructor(socket, p2pMultiMessageApi) {
+  constructor(socket, p2pMessageApi) {
     this.socket = socket;
-    this.p2pMultiMessageApi = p2pMultiMessageApi;
+    this.p2pMessageApi = p2pMessageApi;
     this.createdTopics = [];
-    this.subscribedTopics = [];
   }
 
-  initTopicListeners() {
-    this.provideService(SOCKET_EVENT.SUBSCRIBE_TOPIC, (...args) => {
-      let [clientId, topicName, callback] = args;
-
-      if (!topicName) {
-        if (callback) callback('topicName can not be empty');
-        return;
+  provideService(apiName, handlerFunction) {
+    this.socket.emit(SOCKET_EVENT.CHECK_API_NAME, apiName, apiNameExisted => {
+      if (apiNameExisted) {
+        throw new Error(`Duplicated API name: ${apiName}`);
       }
-
-      this.socket.emit(SOCKET_EVENT.JOIN_ROOM, SOCKET_EVENT_ACTION.CLIENT_SUBSCRIBE_TOPIC, clientId, topicName, callback);
-      if (callback) callback();
-    });
-    this.provideService(SOCKET_EVENT.UNSUBSCRIBE_TOPIC, (...args) => {
-      let [clientId, topicName] = args;
-
-      if (!topicName) return;
-
-      this.socket.emit(SOCKET_EVENT.LEAVE_ROOM, SOCKET_EVENT_ACTION.CLIENT_UNSUBSCRIBE_TOPIC, clientId, topicName);
+      else {
+        this.socket.emit(SOCKET_EVENT.CREATE_API, this.p2pMessageApi.clientId, apiName);
+        this.socket.on(apiName, handlerFunction);
+      }
     });
   }
 
-  emitService(service, api, ...args) {
-    this.p2pMultiMessageApi.emitTo(service, api, ...args);
+  destroyService(apiName = '') {
+    this.socket.emit(SOCKET_EVENT.DESTROY_API, apiName);
   }
 
-  provideService(api, callback) {
-    this.p2pMultiMessageApi.onAny(api, callback);
+  destroyAllServices() {
+    this.socket.emit(SOCKET_EVENT.DESTROY_API);
   }
 
-  destroyService(api, callback) {
-    this.p2pMultiMessageApi.offAny(api, callback);
-    if (!api && !callback) this.initTopicListeners(); // re-init topic listeners after clearing all APIs
-  }
-
-  emitClient(clientId, api, ...args) {
-    this.p2pMultiMessageApi.emitTo(clientId, api, ...args);
-  }
-
-  onService(serviceName, api, callback) {
-    this.p2pMultiMessageApi.from(serviceName).on(api, callback);
-  }
-
-  createTopic(...topicNames) {
-    topicNames = flatten(topicNames);
-    topicNames.forEach(topicName => {
-      if (!topicName || typeof topicName !== 'string') throw new Error(`createTopic error: a string is required for topic name, got ${topicName} instead`);
-      if (this.createdTopics.includes(topicName)) return;
-
-      this.socket.emit(SOCKET_EVENT.JOIN_ROOM, SOCKET_EVENT_ACTION.SERVICE_CREATE_TOPIC, topicName, error => {
-        if (error) throw new Error(error);
-
-        this.createdTopics.push(topicName);
-      });
+  emitService(apiName, ...args) {
+    this.socket.emit(SOCKET_EVENT.CHECK_API_NAME, apiName, apiNameExisted => {
+      if (apiNameExisted) {
+        this.socket.emit(SOCKET_EVENT.USE_API, apiName, ...args);
+      } else {
+        throw new Error(`API is not registered: ${apiName}`)
+      }
     });
-  }
-
-  destroyTopic(...topicNames) {
-    topicNames = flatten(topicNames);
-    topicNames.forEach(topicName => {
-      if (!topicName || typeof topicName !== 'string') throw new Error(`destroyTopic error: a string is required for topic name, got ${topicName} instead`);
-
-      if (!this.createdTopics.includes(topicName)) return;
-
-      pull(this.createdTopics, topicName);
-      this.socket.emit(SOCKET_EVENT.LEAVE_ROOM, SOCKET_EVENT_ACTION.SERVICE_DESTROY_TOPIC, topicName);
-    });
-  }
-
-  publishTopic(topicName, ...args) {
-    if (!topicName || typeof topicName !== 'string') throw new Error(`A string is required for topic name, got ${topicName} instead`);
-
-    if (!this.createdTopics.includes(topicName)) throw new Error(`topic ${topicName} is not yet created`);
-
-    this.socket.emit(SOCKET_EVENT.EMIT_ROOM, topicName, `${topicName}-${SOCKET_EVENT.DEFAULT_TOPIC_EVENT}`, ...args);
-  }
-
-  subscribeTopic(service, topicName, callback) {
-    this.emitService(service, SOCKET_EVENT.SUBSCRIBE_TOPIC, this.p2pMultiMessageApi.clientId, topicName, () => {
-      if (!this.subscribedTopics.includes(topicName)) this.subscribedTopics.push(topicName);
-
-      this.socket.on(`${topicName}-${SOCKET_EVENT.DEFAULT_TOPIC_EVENT}`, callback);
-      this.socket.once(`${topicName}-${SOCKET_EVENT.TOPIC_BEING_DESTROYED}`, () => {
-        this.socket.off(`${topicName}-${SOCKET_EVENT.DEFAULT_TOPIC_EVENT}`, callback);
-      });
-    });
-  }
-
-  unsubscribeTopic(service, topicName) {
-    if (!this.subscribedTopics.includes(topicName)) return; // throw Error is not necessary
-
-    pull(this.subscribedTopics, topicName);
-    this.emitService(service, SOCKET_EVENT.UNSUBSCRIBE_TOPIC, this.p2pMultiMessageApi.clientId, topicName);
-    this.socket.off(`${topicName}-${SOCKET_EVENT.DEFAULT_TOPIC_EVENT}`);
-    this.socket.off(`${topicName}-${SOCKET_EVENT.TOPIC_BEING_DESTROYED}`);
   }
 }
 

@@ -6,7 +6,7 @@ class P2pServerMessageApi {
   }
 
   createListeners(socket, clientId) {
-    socket.on(SOCKET_EVENT.MULTI_API_ADD_TARGET, (targetClientId, callback) => {
+    socket.on(SOCKET_EVENT.ADD_TARGET, (targetClientId, callback) => {
       const targetClientSocket = socket.getSocketByClientId(targetClientId);
       if (!targetClientSocket) {
         callback(`Client ${targetClientId} is not registered to server`);
@@ -14,7 +14,7 @@ class P2pServerMessageApi {
       }
 
       const disconnectListener = (sk, clientId) => {
-        if (sk) sk.emit(SOCKET_EVENT.MULTI_API_TARGET_DISCONNECT, clientId);
+        if (sk) sk.emit(SOCKET_EVENT.TARGET_DISCONNECT, clientId);
       }
       const sourceDisconnectListener = disconnectListener.bind(null, targetClientSocket, clientId); // If source disconnects -> notify target
       const targetDisconnectListener = disconnectListener.bind(null, socket, targetClientId); // If target disconnects -> notify source
@@ -35,7 +35,7 @@ class P2pServerMessageApi {
         if (socket) socket.off('disconnect', sourceDisconnectListener);
       });
 
-      targetClientSocket.emit(SOCKET_EVENT.MULTI_API_ADD_TARGET, clientId, callback);
+      targetClientSocket.emit(SOCKET_EVENT.ADD_TARGET, clientId, callback);
     });
   }
 }
