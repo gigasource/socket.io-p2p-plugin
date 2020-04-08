@@ -67,8 +67,12 @@ class P2pServerCoreApi {
     socket.on(SOCKET_EVENT.CHECK_TOPIC_NAME, (topicName, callback) => {
       callback(this.createdTopics.has(topicName))
     });
-    socket.on(SOCKET_EVENT.CREATE_TOPIC, this.createTopic);
-    socket.on(SOCKET_EVENT.DESTROY_TOPIC, this.destroyTopic);
+    socket.on(SOCKET_EVENT.CREATE_TOPIC, (topicName, callback) => {
+      this.createTopic(topicName, callback);
+    });
+    socket.on(SOCKET_EVENT.DESTROY_TOPIC, (topicName, callback) => {
+      this.destroyTopic(topicName, callback);
+    });
     socket.on(SOCKET_EVENT.JOIN_ROOM, (roomName, callback) => {
       socket.join(roomName, callback);
     });
