@@ -3,11 +3,16 @@ const findKey = require('lodash/findKey');
 const EventEmitter = require('events');
 
 class P2pServerCoreApi {
-  constructor(io) {
+  constructor(io, options) {
     this.clientMap = {};
     this.io = io;
     this.createdTopics = new Set();
     this.ee = new EventEmitter();
+
+    this.ackFunctions = {};
+    this.saveMessage = options.saveMessage;
+    this.deleteMessage = options.deleteMessage;
+    this.loadMessages = options.loadMessages;
   }
 
   addClient(clientId, clientSocketId) {
@@ -33,6 +38,8 @@ class P2pServerCoreApi {
   }
 
   getSocketByClientId(clientId) {
+    if (!this.clientMap[clientId]) return null;
+
     return this.io.sockets.connected[this.getSocketIdByClientId(clientId)];
   }
 
@@ -46,6 +53,65 @@ class P2pServerCoreApi {
     const targetClientSocket = this.getSocketByClientId(targetClientId);
     if (!targetClientSocket) throw new Error(`Can not find socket of client ${targetClientId}`);
     targetClientSocket.emit(event, ...args);
+  }
+
+  emitToPersistent(targetClientId, event, args, ackFnName, ackFnArgs) {
+    if (!Array.isArray(args)) args = [args];
+    if (!Array.isArray(ackFnArgs)) ackFnArgs = [ackFnArgs];
+
+    if (typeof this.saveMessage !== 'function' || typeof this.deleteMessage !== 'function') {
+      throw new Error('Missing saveMessage and deleteMessage function, please provide when you initialize server plugin');
+    }
+
+    (async () => {
+      const messageId = await this.saveMessage(targetClientId, {event, args, ackFnName, ackFnArgs});
+
+      if (!messageId) throw new Error('saveMessage function must return a message ID');
+
+      const targetClientSocket = this.getSocketByClientId(targetClientId);
+
+      if (targetClientSocket) {
+        targetClientSocket.emit(event, ...args, () => {
+          this.deleteMessage(targetClientId, messageId);
+
+          const ackFunctions = this.ackFunctions[ackFnName] || [];
+          ackFunctions.forEach(fn => fn(...ackFnArgs));
+        });
+      }
+    })()
+  }
+
+  registerAckFunction(name, fn) {
+    this.ackFunctions[name] = this.ackFunctions[name] || [];
+    this.ackFunctions[name].push(fn);
+  }
+
+  unregisterAckFunction(name, fn) {
+    this.ackFunctions[name] = this.ackFunctions[name] || [];
+
+    if (fn) {
+      this.ackFunctions[name] = this.ackFunctions[name].filter(e => e !== fn);
+    } else {
+      delete this.ackFunctions[name];
+    }
+  }
+
+  sendSavedMessages(targetClientId, socket) {
+    if (typeof this.loadMessages !== 'function' || typeof this.deleteMessage !== 'function') return;
+
+    (async () => {
+      const savedMessages = await this.loadMessages(targetClientId)
+
+      if (!savedMessages || savedMessages.length === 0) return;
+      savedMessages.forEach(({_id, event, args, ackFnName, ackFnArgs}) => {
+        socket.emit(event, ...args, () => {
+          this.deleteMessage(targetClientId, _id);
+
+          const ackFunctions = this.ackFunctions[ackFnName] || [];
+          ackFunctions.forEach(fn => fn(...ackFnArgs));
+        });
+      });
+    })();
   }
 
   createListeners(io, socket, clientId) {
@@ -110,11 +176,6 @@ class P2pServerCoreApi {
 
   initSocketBasedApis(socket) {
     socket.on(SOCKET_EVENT.LIST_CLIENTS, clientCallbackFn => clientCallbackFn(this.getAllClientId()));
-  }
-
-  applyWhenConnect(targetClientId, fn) {
-    if (this.clientMap[targetClientId]) return fn();
-    this.ee.once(`${targetClientId}@connected`, fn);
   }
 }
 

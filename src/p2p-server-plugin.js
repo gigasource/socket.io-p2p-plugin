@@ -3,8 +3,8 @@ const P2pServerMessageApi = require('./api/server/message');
 const P2pServerStreamApi = require('./api/server/stream');
 const P2pServerServiceApi = require('./api/server/service');
 
-module.exports = function p2pServerPlugin(io, options) {
-  const p2pServerCoreApi = new P2pServerCoreApi(io);
+module.exports = function p2pServerPlugin(io, options = {}) {
+  const p2pServerCoreApi = new P2pServerCoreApi(io, options);
   const p2pServerMessageApi = new P2pServerMessageApi(p2pServerCoreApi);
   const p2pServerStreamApi = new P2pServerStreamApi(p2pServerCoreApi);
   const p2pServerServiceApi = new P2pServerServiceApi(p2pServerCoreApi);
@@ -23,6 +23,7 @@ module.exports = function p2pServerPlugin(io, options) {
       return targetClientSocket;
     }
 
+    p2pServerCoreApi.sendSavedMessages(clientId, socket);
     p2pServerCoreApi.addClient(clientId, socket.id);
 
     p2pServerCoreApi.createListeners(io, socket, clientId);
@@ -30,24 +31,26 @@ module.exports = function p2pServerPlugin(io, options) {
     p2pServerMessageApi.createListeners(socket, clientId);
     p2pServerStreamApi.createListeners(socket, clientId);
     p2pServerServiceApi.createListeners(io, socket);
-
-    p2pServerCoreApi.ee.emit(`${clientId}@connected`);
   });
 
   return new Proxy(io, {
     get: (obj, prop) => {
       if (prop === 'getSocketIdByClientId') return p2pServerCoreApi.getSocketIdByClientId.bind(p2pServerCoreApi);
+      if (prop === 'getSocketByClientId') return p2pServerCoreApi.getSocketByClientId.bind(p2pServerCoreApi);
       if (prop === 'getAllClientId') return p2pServerCoreApi.getAllClientId.bind(p2pServerCoreApi);
       if (prop === 'getClientIdBySocketId') return p2pServerCoreApi.getClientIdBySocketId.bind(p2pServerCoreApi);
       if (prop === 'addStreamAsClient') return p2pServerStreamApi.addStreamAsClient.bind(p2pServerStreamApi);
 
-      if (prop === 'applyWhenConnect') return p2pServerCoreApi.applyWhenConnect.bind(p2pServerCoreApi);
       if (prop === 'createTopic') return p2pServerCoreApi.createTopic.bind(p2pServerCoreApi);
       if (prop === 'destroyTopic') return p2pServerCoreApi.destroyTopic.bind(p2pServerCoreApi);
       if (prop === 'publishTopic') return p2pServerCoreApi.publishTopic.bind(p2pServerCoreApi);
       if (prop === 'emitTo') return p2pServerCoreApi.emitTo.bind(p2pServerCoreApi);
+      if (prop === 'emitToPersistent') return p2pServerCoreApi.emitToPersistent.bind(p2pServerCoreApi);
+      if (prop === 'registerAckFunction') return p2pServerCoreApi.registerAckFunction.bind(p2pServerCoreApi);
+      if (prop === 'unregisterAckFunction') return p2pServerCoreApi.unregisterAckFunction.bind(p2pServerCoreApi);
       if (prop === '$emit') return p2pServerCoreApi.ee.emit.bind(p2pServerCoreApi.ee);
       if (prop === '$on') return p2pServerCoreApi.ee.on.bind(p2pServerCoreApi.ee);
+      if (prop === '$once') return p2pServerCoreApi.ee.once.bind(p2pServerCoreApi.ee);
 
       if (prop === 'provideService') return p2pServerServiceApi.provideService.bind(p2pServerServiceApi);
       if (prop === 'destroyService') return p2pServerServiceApi.destroyService.bind(p2pServerServiceApi);
