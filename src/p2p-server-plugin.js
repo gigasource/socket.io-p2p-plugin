@@ -2,6 +2,7 @@ const P2pServerCoreApi = require('./api/server/core');
 const P2pServerMessageApi = require('./api/server/message');
 const P2pServerStreamApi = require('./api/server/stream');
 const P2pServerServiceApi = require('./api/server/service');
+const uuidv1 = require('uuid/v1');
 
 module.exports = function p2pServerPlugin(io, options = {}) {
   const p2pServerCoreApi = new P2pServerCoreApi(io, options);
@@ -10,7 +11,7 @@ module.exports = function p2pServerPlugin(io, options = {}) {
   const p2pServerServiceApi = new P2pServerServiceApi(p2pServerCoreApi);
 
   io.on('connect', (socket) => {
-    const {clientId} = socket.request._query;
+    const {clientId} = socket.request._query || uuidv1();
 
     socket.getSocketByClientId = (targetClientId) => {
       const targetClientSocket = p2pServerCoreApi.getSocketByClientId(targetClientId);
