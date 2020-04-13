@@ -10,8 +10,10 @@ module.exports = function p2pServerPlugin(io, options = {}) {
   const p2pServerStreamApi = new P2pServerStreamApi(p2pServerCoreApi);
   const p2pServerServiceApi = new P2pServerServiceApi(p2pServerCoreApi);
 
-  io.on('connect', (socket) => {
+  io.on('connect', socket => {
     const {clientId} = socket.request._query || uuidv1();
+
+    if (p2pServerCoreApi.getSocketIdByClientId(clientId)) return socket.disconnect(true);
 
     socket.getSocketByClientId = (targetClientId) => {
       const targetClientSocket = p2pServerCoreApi.getSocketByClientId(targetClientId);
