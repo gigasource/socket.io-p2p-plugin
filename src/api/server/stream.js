@@ -167,7 +167,7 @@ class ServerSideDuplex extends Duplex {
   _write(chunk, encoding, callback) {
     const eventName = `${SOCKET_EVENT.P2P_EMIT_STREAM}${SOCKET_EVENT.STREAM_IDENTIFIER_PREFIX}${this.sourceStreamId}`;
 
-    this.socket.emit(eventName, this.sourceClientId, chunk, callback);
+    this.socket.emit(eventName, chunk, callback);
   };
 
   // Readable stream handlers & events
