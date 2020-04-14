@@ -34,6 +34,10 @@ class P2pClientMessageApi {
     else this.socket.emit(SOCKET_EVENT.P2P_EMIT, {targetClientId, event, args});
   }
 
+  off(...args) {
+    this.socket.off(...args);
+  }
+
   on(...args) {
     this.socket.on(...args);
   }

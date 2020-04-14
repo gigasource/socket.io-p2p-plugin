@@ -123,7 +123,7 @@ class ServerSideDuplex extends Duplex {
 
     // Socket.IO events
     this.onReceiveStreamData = (data, callbackFn) => {
-      let [targetClientId, chunk] = data;
+      let [chunk] = data;
       if (chunk instanceof Array) chunk = Buffer.from(chunk);
 
       if (!this.push(chunk)) { // if reach highWaterMark -> signal the other client to pause writing
