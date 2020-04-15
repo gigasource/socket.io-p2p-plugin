@@ -56,11 +56,7 @@ class P2pServerStreamApi {
     };
 
     if (callback) {
-      socket.emit(SOCKET_EVENT.P2P_EMIT_ACKNOWLEDGE, {
-        targetClientId,
-        event: SOCKET_EVENT.CREATE_STREAM,
-        args: connectionInfo,
-      }, err => {
+      socket.emit(SOCKET_EVENT.CREATE_STREAM, connectionInfo, err => {
         if (err) return callback(err);
 
         const duplex = new ServerSideDuplex(socket, connectionInfo, duplexOpts);
