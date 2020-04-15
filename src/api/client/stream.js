@@ -60,11 +60,11 @@ class P2pClientStreamApi {
   }
 
   createClientStream(connectionInfo, options) {
+    const {ignoreStreamError, ...opts} = options
+
     const {sourceStreamId, targetStreamId, targetClientId} = connectionInfo;
     let writeCallbackFn;
-    let duplex = new Duplex({
-      ...options,
-    });
+    let duplex = new Duplex(opts);
     duplex.sourceStreamId = sourceStreamId;
     duplex.targetStreamId = targetStreamId;
     duplex.targetClientId = targetClientId;
@@ -122,7 +122,7 @@ class P2pClientStreamApi {
       duplex.destroy();
       if (duplex.listenerCount('error') === 0) {
         // Do not suppress the throwing behavior - this 'error' event will be caught by system if not handled by duplex
-        duplex.emit('error', err);
+        if (!ignoreStreamError) duplex.emit('error', err);
       }
     }
 

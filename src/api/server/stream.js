@@ -77,7 +77,9 @@ class P2pServerStreamApi {
 
 class ServerSideDuplex extends Duplex {
   constructor(socket, connectionInfo, options) {
-    super(options);
+    const {ignoreStreamError, ...opts} = options
+
+    super(opts);
 
     const {sourceStreamId, targetStreamId, sourceClientId, targetClientId} = connectionInfo;
     this.writeCallbackFn = null;
@@ -94,7 +96,7 @@ class ServerSideDuplex extends Duplex {
       this.destroy();
       if (this.listenerCount('error') === 0) {
         // Do not suppress the throwing behavior - this 'error' event will be caught by system if not handled by duplex
-        this.emit('error', err);
+        if (!ignoreStreamError) this.emit('error', err);
       }
     }
 
