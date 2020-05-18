@@ -13,9 +13,7 @@ module.exports = function p2pServerPlugin(io, options = {}) {
   const p2pServerServiceApi = new P2pServerServiceApi(p2pServerCoreApi);
 
   io.on('connect', socket => {
-    const {clientId} = socket.request._query || uuidv1();
-
-    if (!clientId) return;
+    let {clientId = uuidv1()} = socket.request._query;
 
     if (!clientOverwrite && p2pServerCoreApi.getSocketIdByClientId(clientId)) {
       const errorMessage = `Duplicated clientId: ${clientId}, sockets with duplicated clientId will be forcibly disconnected`;
