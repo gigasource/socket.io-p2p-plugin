@@ -2,6 +2,7 @@ const P2pServerCoreApi = require('./api/server/core');
 const P2pServerMessageApi = require('./api/server/message');
 const P2pServerStreamApi = require('./api/server/stream');
 const P2pServerServiceApi = require('./api/server/service');
+const {SOCKET_EVENT: {SERVER_ERROR}} = require('./util/constants')
 const uuidv1 = require('uuid/v1');
 
 module.exports = function p2pServerPlugin(io, options = {}) {
@@ -14,7 +15,13 @@ module.exports = function p2pServerPlugin(io, options = {}) {
   io.on('connect', socket => {
     const {clientId} = socket.request._query || uuidv1();
 
-    if (!clientOverwrite && p2pServerCoreApi.getSocketIdByClientId(clientId)) return socket.disconnect(true);
+    if (!clientOverwrite && p2pServerCoreApi.getSocketIdByClientId(clientId)) {
+      const errorMessage = `Duplicated clientId: ${clientId}, sockets with duplicated clientId will be forcibly disconnected`;
+
+      console.error(errorMessage)
+      socket.emit(SERVER_ERROR, errorMessage);
+      return socket.disconnect(true);
+    }
 
     socket.getSocketByClientId = (targetClientId) => {
       const targetClientSocket = p2pServerCoreApi.getSocketByClientId(targetClientId);
@@ -27,8 +34,8 @@ module.exports = function p2pServerPlugin(io, options = {}) {
       return targetClientSocket;
     }
 
-    p2pServerCoreApi.sendSavedMessages(clientId, socket);
     p2pServerCoreApi.addClient(clientId, socket.id);
+    p2pServerCoreApi.sendSavedMessages(clientId, socket);
 
     p2pServerCoreApi.createListeners(io, socket, clientId);
     p2pServerCoreApi.initSocketBasedApis(socket);
