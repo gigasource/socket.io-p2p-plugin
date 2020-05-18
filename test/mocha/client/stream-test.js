@@ -7,7 +7,7 @@ const {SOCKET_EVENT} = require('../../../src/util/constants');
 const streamify = require('stream-array');
 chai.use(chaiAsPromised);
 
-describe('stream API for p2p-client-plugin', function () {
+describe('Client Stream API', function () {
   const numberOfClients = 4;
   let client1, client2, client3, client4;
 
@@ -30,13 +30,13 @@ describe('stream API for p2p-client-plugin', function () {
   });
 
   describe('constructor', function () {
-    it('should create a MULTI_API_CREATE_STREAM to refuse connection attempt', async function () {
+    it('should listen to CREATE_STREAM event', async function () {
       expect(client1.listeners(SOCKET_EVENT.CREATE_STREAM)).to.have.lengthOf(1);
     });
-  })
+  });
 
   describe('addP2pStream function', function () {
-    it('should throw error if peer is not listening to add stream event', async function () {
+    it('should throw error if peer is not listening to add stream event', function () {
       return expect(client2.addP2pStream(client1.clientId, {})).to.be.rejected;
     });
     it('should return a Duplex if peer is listening to add stream event', async function () {
@@ -55,16 +55,20 @@ describe('stream API for p2p-client-plugin', function () {
 
       expect(initialListener === newListener).to.equal(true);
 
-      client2.onAddP2pStream({}, () => {});
+      client2.onAddP2pStream({}, () => {
+      });
       expect(client2.listeners(SOCKET_EVENT.CREATE_STREAM)).to.have.lengthOf(1);
       newListener = client2.listeners(SOCKET_EVENT.CREATE_STREAM)[0];
 
       expect(initialListener === newListener).to.equal(false);
     });
     it('should remove old listeners if called more than once', function () {
-      client2.onAddP2pStream({}, d => {});
-      client2.onAddP2pStream({}, d => {});
-      client2.onAddP2pStream({}, d => {});
+      client2.onAddP2pStream({}, () => {
+      });
+      client2.onAddP2pStream({}, () => {
+      });
+      client2.onAddP2pStream({}, () => {
+      });
 
       expect(client2.listeners(SOCKET_EVENT.CREATE_STREAM).length).to.equal(1);
     });
@@ -82,7 +86,7 @@ describe('stream API for p2p-client-plugin', function () {
       const duplex = await client1.addP2pStream(client2.clientId, {});
       expect(duplex._events.error instanceof Function).to.equal(true);
     });
-    it('should be destroyable (+ remove related listeners on destroyed)', async function () {
+    it('should be destroyable & remove related listeners on destroyed', async function () {
       const originalCount1 = client1.listeners('disconnect').length;
       const originalCount2 = client1.listeners(SOCKET_EVENT.TARGET_DISCONNECT).length;
       let sendDataEvent1, sendDataEvent2;
@@ -98,10 +102,10 @@ describe('stream API for p2p-client-plugin', function () {
       expect(client2.listeners('disconnect')).to.have.lengthOf(originalCount1 + 1);
       expect(client1.listeners(SOCKET_EVENT.TARGET_DISCONNECT)).to.have.lengthOf(originalCount2 + 1);
       expect(client2.listeners(SOCKET_EVENT.TARGET_DISCONNECT)).to.have.lengthOf(originalCount2 + 1);
-      expect(client1.listeners(sendDataEvent1)).to.have.lengthOf( 1);
-      expect(client2.listeners(sendDataEvent2)).to.have.lengthOf( 1);
-      expect(client1.listeners(SOCKET_EVENT.PEER_STREAM_DESTROYED)).to.have.lengthOf( 1);
-      expect(client2.listeners(SOCKET_EVENT.PEER_STREAM_DESTROYED)).to.have.lengthOf( 1);
+      expect(client1.listeners(sendDataEvent1)).to.have.lengthOf(1);
+      expect(client2.listeners(sendDataEvent2)).to.have.lengthOf(1);
+      expect(client1.listeners(SOCKET_EVENT.PEER_STREAM_DESTROYED)).to.have.lengthOf(1);
+      expect(client2.listeners(SOCKET_EVENT.PEER_STREAM_DESTROYED)).to.have.lengthOf(1);
 
       duplex.destroy();
       await wait(50);
@@ -112,10 +116,10 @@ describe('stream API for p2p-client-plugin', function () {
       expect(client2.listeners('disconnect')).to.have.lengthOf(originalCount1);
       expect(client1.listeners(SOCKET_EVENT.TARGET_DISCONNECT)).to.have.lengthOf(originalCount2);
       expect(client2.listeners(SOCKET_EVENT.TARGET_DISCONNECT)).to.have.lengthOf(originalCount2);
-      expect(client1.listeners(sendDataEvent1)).to.have.lengthOf( 0);
-      expect(client2.listeners(sendDataEvent2)).to.have.lengthOf( 0);
-      expect(client1.listeners(SOCKET_EVENT.PEER_STREAM_DESTROYED)).to.have.lengthOf( 0);
-      expect(client2.listeners(SOCKET_EVENT.PEER_STREAM_DESTROYED)).to.have.lengthOf( 0);
+      expect(client1.listeners(sendDataEvent1)).to.have.lengthOf(0);
+      expect(client2.listeners(sendDataEvent2)).to.have.lengthOf(0);
+      expect(client1.listeners(SOCKET_EVENT.PEER_STREAM_DESTROYED)).to.have.lengthOf(0);
+      expect(client2.listeners(SOCKET_EVENT.PEER_STREAM_DESTROYED)).to.have.lengthOf(0);
     });
     it('should be able to transfer data to target client when connected', async function () {
       let duplex1, duplex2;
@@ -132,30 +136,38 @@ describe('stream API for p2p-client-plugin', function () {
       expect(result[0]).to.equal(inputArr[0]);
       expect(result[result.length - 1]).to.equal(inputArr[result.length - 1]);
     });
-    it('should not send data to wrong target', async function () {
-      let duplex1a, duplex1b, duplex3, duplex4;
-      const result = [];
+    it('should send data to correct target', async function () {
+      let duplex1, duplex2, duplex3, duplex4;
+      const result1 = [];
+      const result2 = [];
 
+      client3.onAddP2pStream({}, d => duplex3 = d);
       client4.onAddP2pStream({}, d => duplex4 = d);
 
       // 1b - 4 will be connected because 1b is called last -> duplex4 = target duplex of 1b
-      duplex1a = await client1.addP2pStream(client4.clientId, {});
-      duplex3 = await client3.addP2pStream(client4.clientId, {});
-      duplex1b = await client1.addP2pStream(client4.clientId, {});
+      duplex1 = await client1.addP2pStream(client3.clientId, {});
+      duplex2 = await client1.addP2pStream(client4.clientId, {});
 
-      const input1a = ['1', 'a', 'client'];
-      const input1b = [2, 3, 4, 5, 6].map(e => e.toString());
-      const input3 = [3, 3, 3, 3].map(e => e.toString());
+      const input1 = ['1', 'a', 'client'];
+      const input2 = [3, 3, 3, 3].map(e => e.toString());
 
-      duplex4.on('data', chunk => result.push(chunk.toString()));
-      streamify(input1a).pipe(duplex1a);
-      streamify(input1b).pipe(duplex1b);
-      streamify(input3).pipe(duplex3);
+      duplex3.on('data', chunk => result1.push(chunk.toString()));
+      duplex4.on('data', chunk => result2.push(chunk.toString()));
+
+      streamify(input1).pipe(duplex1);
+      streamify(input2).pipe(duplex2);
 
       await wait(200);
-      expect(result).to.have.lengthOf(input1b.length);
-      expect(result[0]).to.equal(input1b[0]);
-      expect(result[result.length - 1]).to.equal(input1b[result.length - 1]);
+      expect(result1).to.have.lengthOf(input1.length);
+      expect(result2).to.have.lengthOf(input2.length);
+
+      result1.forEach((e, index) => {
+        expect(result1[index]).to.equal(input1[index]);
+      });
+
+      result2.forEach((e, index) => {
+        expect(result2[index]).to.equal(input2[index]);
+      });
     });
     it('should not suppress the throwing behavior of \'error\' events (throw the error to system)', async function () {
       client2.onAddP2pStream();
@@ -190,11 +202,12 @@ describe('stream API for p2p-client-plugin', function () {
       const dataToBeSent = new Array(100).fill('W'); // 100 bytes
       const consumeRate = 10; // 10 bytes/s
 
-      dataToBeSent.forEach(e => producer.write(e));
-      await wait(500);
+      for (const chunk of dataToBeSent) {
+        producer.write(chunk);
+      }
 
       const checkInterval = new Promise(resolve => {
-        let i = 1;
+        // let i = 1;
         setInterval(function () {
           // console.log(`Read ${i++}: producer buffer length: ${producer._writableState.length} - consumer buffer length: ${consumer._readableState.length}`);
           const chunk = consumer.read(consumeRate);

@@ -1,4 +1,4 @@
-const {SOCKET_EVENT} = require('../../util/constants');
+const {SOCKET_EVENT, SERVER_CONFIG: {SERVER_SIDE_SOCKET_ID_POSTFIX}} = require('../../util/constants');
 
 class P2pServerMessageApi {
   constructor(coreApi) {
@@ -7,7 +7,7 @@ class P2pServerMessageApi {
 
   createListeners(socket, clientId) {
     socket.on(SOCKET_EVENT.ADD_TARGET, (targetClientId, callback) => {
-      const targetClientSocket = socket.getSocketByClientId(targetClientId);
+      const targetClientSocket = this.coreApi.getSocketByClientId(targetClientId);
       if (!targetClientSocket) {
         callback(`Client ${targetClientId} is not registered to server`);
         return;
@@ -22,7 +22,7 @@ class P2pServerMessageApi {
       socket.once('disconnect', () => {
         sourceDisconnectListener();
 
-        if (targetClientId.endsWith('-server-side')) return;
+        if (targetClientId.endsWith(SERVER_SIDE_SOCKET_ID_POSTFIX)) return; // server-side sockets are not added to client list -> ignore
         if (!targetClientSocket) {
           this.coreApi.emitError(socket, new Error(`Could not find target client '${targetClientId}' socket`));
           return;

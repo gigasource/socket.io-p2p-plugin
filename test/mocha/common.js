@@ -6,6 +6,7 @@ const p2pServerPlugin = require('../../src/p2p-server-plugin');
 const p2pClientPlugin = require('../../src/p2p-client-plugin');
 const http = require('http');
 const uuidv1 = require('uuid/v1');
+const redis = require('socket.io-redis');
 
 let httpServer;
 let io;
@@ -16,7 +17,18 @@ module.exports.startServer = (options) => {
   httpServer = http.createServer((req, res) => res.end()).listen(port);
 
   io = socketIO.listen(httpServer);
-  return p2pServerPlugin(io, options);
+
+  if (options && options.redisTest) io.adapter(redis({host: 'localhost', port: 6379}));
+
+  const server = p2pServerPlugin(io, options);
+
+  server.port = port;
+  server.cleanup = () => {
+    httpServer.close();
+    io.close();
+  }
+
+  return server;
 }
 
 module.exports.stopServer = () => {
@@ -26,12 +38,12 @@ module.exports.stopServer = () => {
 
 module.exports.wait = async (ms) => await new Promise(resolve => setTimeout(resolve, ms));
 
-module.exports.startClients = (numberOfClients) => {
+module.exports.startClients = (numberOfClients, serverPort) => {
   const clients = [];
 
   for (let i = 0; i < numberOfClients; i++) {
     const clientId = uuidv1();
-    const client = socketClient.connect(`http://localhost:${port}?clientId=${clientId}`);
+    const client = socketClient.connect(`http://localhost:${serverPort || port}?clientId=${clientId}`);
     clients.push(p2pClientPlugin(client, clientId));
   }
 
@@ -59,10 +71,6 @@ module.exports.terminateClients = (...clients) => {
   });
 }
 
-// before(async function () {
-//   module.exports.server = startServer();
-// });
-//
-// after(function () {
-//   stopServer();
-// });
+module.exports.getCurrentServerPort = function () {
+  return port;
+}

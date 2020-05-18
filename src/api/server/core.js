@@ -1,12 +1,15 @@
-const {SOCKET_EVENT} = require('../../util/constants');
+const {
+  SOCKET_EVENT, SERVER_CONFIG: {SERVER_SIDE_SOCKET_ID_POSTFIX},
+  HOOK_NAME: {POST_EMIT_TO, POST_EMIT_TO_PERSISTENT_ACK},
+} = require('../../util/constants');
 const findKey = require('lodash/findKey');
 const EventEmitter = require('events');
+const kareem = require('../../util/hooks');
 
 class P2pServerCoreApi {
   constructor(io, options) {
     this.clientMap = {};
     this.io = io;
-    this.createdTopics = new Set();
     this.ee = new EventEmitter();
 
     this.ackFunctions = {};
@@ -60,16 +63,27 @@ class P2pServerCoreApi {
 
   emitTo(targetClientId, event, ...args) {
     const targetClientSocket = this.getSocketByClientId(targetClientId);
-    if (!targetClientSocket) throw new Error(`Can not find socket of client ${targetClientId}`);
-    targetClientSocket.emit(event, ...args);
+
+    if (!targetClientSocket) {
+      if (kareem.hasHooks(POST_EMIT_TO)) {
+        kareem.execPost(POST_EMIT_TO, null, [targetClientId, event, args], err => console.error(err));
+      } else {
+        console.error((`Client ${targetClientId} is not connected to server`));
+      }
+    } else {
+      targetClientSocket.emit(event, ...args);
+    }
   }
 
-  emitToPersistent(targetClientId, event, args, ackFnName, ackFnArgs) {
+  emitToPersistent(targetClientId, event, args = [], ackFnName, ackFnArgs = []) {
+    if (!args) args = [];
+    if (!ackFnArgs) ackFnArgs = [];
+
     if (!Array.isArray(args)) args = [args];
     if (!Array.isArray(ackFnArgs)) ackFnArgs = [ackFnArgs];
 
-    if (typeof this.saveMessage !== 'function' || typeof this.deleteMessage !== 'function') {
-      throw new Error('Missing saveMessage and deleteMessage function, please provide when you initialize server plugin');
+    if (typeof this.saveMessage !== 'function' || typeof this.deleteMessage !== 'function' || typeof this.loadMessages !== 'function') {
+      throw new Error('Missing saveMessage, deleteMessage and loadMessages functions, please provide them when you initialize server plugin');
     }
 
     (async () => {
@@ -77,16 +91,14 @@ class P2pServerCoreApi {
 
       if (!messageId) throw new Error('saveMessage function must return a message ID');
 
-      const targetClientSocket = this.getSocketByClientId(targetClientId);
+      args.push((...targetClientCallbackArgs) => {
+        this.deleteMessage(targetClientId, messageId);
 
-      if (targetClientSocket) {
-        targetClientSocket.emit(event, ...args, () => {
-          this.deleteMessage(targetClientId, messageId);
+        const ackFunctions = this.ackFunctions[ackFnName] || [];
+        ackFunctions.forEach(fn => fn(...(ackFnArgs.concat(targetClientCallbackArgs))));
+      });
 
-          const ackFunctions = this.ackFunctions[ackFnName] || [];
-          ackFunctions.forEach(fn => fn(...ackFnArgs));
-        });
-      }
+      this.emitTo(targetClientId, event, ...args);
     })()
   }
 
@@ -105,49 +117,58 @@ class P2pServerCoreApi {
     }
   }
 
-  sendSavedMessages(targetClientId, socket) {
+  sendSavedMessages(targetClientId) {
     if (typeof this.loadMessages !== 'function' || typeof this.deleteMessage !== 'function') return;
 
     (async () => {
-      const savedMessages = await this.loadMessages(targetClientId)
+      const savedMessages = await this.loadMessages(targetClientId);
 
       if (!savedMessages || savedMessages.length === 0) return;
       savedMessages.forEach(({_id, event, args, ackFnName, ackFnArgs}) => {
-        socket.emit(event, ...args, () => {
+        this.emitTo(targetClientId, event, ...args, (...targetClientCallbackArgs) => {
           this.deleteMessage(targetClientId, _id);
 
           const ackFunctions = this.ackFunctions[ackFnName] || [];
-          ackFunctions.forEach(fn => fn(...ackFnArgs));
+
+          if (ackFunctions.length > 0) {
+            ackFunctions.forEach(fn => fn(...(ackFnArgs.concat(targetClientCallbackArgs))));
+          } else {
+            if (kareem.hasHooks(POST_EMIT_TO_PERSISTENT_ACK)) {
+              kareem.execPost(POST_EMIT_TO_PERSISTENT_ACK, null, [ackFnName, ackFnArgs.concat(targetClientCallbackArgs)], () => {
+              });
+            }
+          }
         });
       });
     })();
   }
 
   createListeners(io, socket, clientId) {
-    socket.on('disconnect', () => {
+    socket.once('disconnect', () => {
       this.removeClient(clientId);
     });
 
-    this.p2pEmitListener = ({targetClientId, event, args}) => {
-      const targetClientSocket = socket.getSocketByClientId(targetClientId);
-      if (targetClientSocket) targetClientSocket.emit(event, ...args);
-    };
-    this.p2pEmitAckListener = ({targetClientId, event, args}, acknowledgeFn) => {
-      const targetClientSocket = socket.getSocketByClientId(targetClientId);
-      if (targetClientSocket) targetClientSocket.emit(event, ...args, acknowledgeFn);
+    const p2pEmitListener = ({targetClientId, event, args}, acknowledgeFn) => {
+      if (acknowledgeFn) args.push(acknowledgeFn); // if event === P2P_EMIT_ACKNOWLEDGE
+      const targetClientSocket = this.getSocketByClientId(targetClientId);
+
+      if (!targetClientSocket) {
+        if (targetClientId.endsWith(SERVER_SIDE_SOCKET_ID_POSTFIX)) return; // server-side sockets are not added to client list -> ignore
+        const error = new Error(`Could not find target client '${targetClientId}' socket`);
+
+        if (kareem.hasHooks(POST_EMIT_TO)) {
+          kareem.execPost(POST_EMIT_TO, null, [targetClientId, event, args], err => err & this.emitError(socket, error));
+        } else {
+          this.emitError(socket, error);
+        }
+      } else {
+        targetClientSocket.emit(event, ...args);
+      }
     };
 
-    socket.on(SOCKET_EVENT.P2P_EMIT, this.p2pEmitListener);
-    socket.on(SOCKET_EVENT.P2P_EMIT_ACKNOWLEDGE, this.p2pEmitAckListener);
-    socket.on(SOCKET_EVENT.CHECK_TOPIC_NAME, (topicName, callback) => {
-      callback(this.createdTopics.has(topicName))
-    });
-    socket.on(SOCKET_EVENT.CREATE_TOPIC, (topicName, callback) => {
-      this.createTopic(topicName, callback);
-    });
-    socket.on(SOCKET_EVENT.DESTROY_TOPIC, (topicName, callback) => {
-      this.destroyTopic(topicName, callback);
-    });
+    socket.on(SOCKET_EVENT.P2P_EMIT, p2pEmitListener);
+    socket.on(SOCKET_EVENT.P2P_EMIT_ACKNOWLEDGE, p2pEmitListener);
+
     socket.on(SOCKET_EVENT.JOIN_ROOM, (roomName, callback) => {
       socket.join(roomName, callback);
     });
@@ -159,32 +180,8 @@ class P2pServerCoreApi {
     });
   }
 
-  createTopic(topicName, callback) {
-    this.createdTopics.add(topicName);
-    if (callback) callback();
-  }
-
-  destroyTopic(topicName, callback) {
-    this.createdTopics.delete(topicName);
-    const socketsInRoom = this.io.sockets.adapter.rooms[topicName].sockets;
-
-    if (socketsInRoom) {
-      Object.keys(socketsInRoom).forEach(key => {
-        const sk = this.io.sockets.connected[key];
-        sk.emit(`${topicName}-${SOCKET_EVENT.TOPIC_BEING_DESTROYED}`);
-        sk.leave(topicName, null);
-      });
-    }
-
-    if (callback) callback();
-  }
-
-  publishTopic(topicName, ...args) {
-    this.io.to(topicName).emit(`${topicName}-${SOCKET_EVENT.DEFAULT_TOPIC_EVENT}`, ...args);
-  }
-
   initSocketBasedApis(socket) {
-    socket.on(SOCKET_EVENT.LIST_CLIENTS, clientCallbackFn => clientCallbackFn(this.getAllClientId()));
+    // socket.on(SOCKET_EVENT.LIST_CLIENTS, clientCallbackFn => clientCallbackFn(this.getAllClientId()));
   }
 }
 

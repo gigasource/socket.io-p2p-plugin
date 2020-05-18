@@ -8,9 +8,9 @@ class P2pClientStreamApi {
     this.p2pClientMessageApi = p2pMultiMessageApi;
     this.clientId = p2pMultiMessageApi.clientId;
 
-    // returns false if client haven't listened on the event -> notify peer that this client is not ready
+    // returns false if client haven't used onAddP2pStream function -> notify peer that this client is not ready
     this.socket.on(SOCKET_EVENT.CREATE_STREAM, (connectionInfo, serverCallback) => {
-      serverCallback(`Client ${this.clientId} is not listening to create stream event`);
+      serverCallback(`Client ${this.clientId} is not ready for streaming, onAddP2pStream function is required`);
     });
   }
 
@@ -59,7 +59,7 @@ class P2pClientStreamApi {
     this.socket.off(SOCKET_EVENT.CREATE_STREAM);
   }
 
-  createClientStream(connectionInfo, options) {
+  createClientStream(connectionInfo, options = {}) {
     const {ignoreStreamError, ...opts} = options
 
     const {sourceStreamId, targetStreamId, targetClientId} = connectionInfo;
@@ -99,16 +99,16 @@ class P2pClientStreamApi {
 
     const addSocketListeners = () => {
       const emitEvent = `${SOCKET_EVENT.P2P_EMIT_STREAM}${SOCKET_EVENT.STREAM_IDENTIFIER_PREFIX}${targetStreamId}`;
-      this.p2pClientMessageApi.on(emitEvent, onReceiveStreamData);
-      this.p2pClientMessageApi.on(SOCKET_EVENT.PEER_STREAM_DESTROYED, onTargetStreamDestroyed);
+      this.socket.on(emitEvent, onReceiveStreamData);
+      this.socket.on(SOCKET_EVENT.PEER_STREAM_DESTROYED, onTargetStreamDestroyed);
       this.socket.once('disconnect', onDisconnect);
       this.socket.on(SOCKET_EVENT.TARGET_DISCONNECT, onTargetDisconnect);
     }
 
     const removeSocketListeners = () => {
       const emitEvent = `${SOCKET_EVENT.P2P_EMIT_STREAM}${SOCKET_EVENT.STREAM_IDENTIFIER_PREFIX}${targetStreamId}`;
-      this.p2pClientMessageApi.off(emitEvent);
-      this.p2pClientMessageApi.off(SOCKET_EVENT.PEER_STREAM_DESTROYED, onTargetStreamDestroyed);
+      this.socket.off(emitEvent);
+      this.socket.off(SOCKET_EVENT.PEER_STREAM_DESTROYED, onTargetStreamDestroyed);
       this.socket.off('disconnect', onDisconnect);
       this.socket.off(SOCKET_EVENT.TARGET_DISCONNECT, onTargetDisconnect);
     }
