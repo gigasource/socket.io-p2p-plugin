@@ -16,6 +16,7 @@ class P2pServerCoreApi {
     this.saveMessage = options.saveMessage;
     this.deleteMessage = options.deleteMessage;
     this.loadMessages = options.loadMessages;
+    this.updateMessage = options.updateMessage;
   }
 
   addClient(clientId, clientSocketId) {
@@ -76,18 +77,17 @@ class P2pServerCoreApi {
   }
 
   emitToPersistent(targetClientId, event, args = [], ackFnName, ackFnArgs = []) {
+    const missingFunctionError = this.checkRequiredFunctions();
+    if (missingFunctionError) throw missingFunctionError;
+
     if (!args) args = [];
     if (!ackFnArgs) ackFnArgs = [];
 
     if (!Array.isArray(args)) args = [args];
     if (!Array.isArray(ackFnArgs)) ackFnArgs = [ackFnArgs];
 
-    if (typeof this.saveMessage !== 'function' || typeof this.deleteMessage !== 'function' || typeof this.loadMessages !== 'function') {
-      throw new Error('Missing saveMessage, deleteMessage and loadMessages functions, please provide them when you initialize server plugin');
-    }
-
     (async () => {
-      const messageId = await this.saveMessage(targetClientId, {event, args, ackFnName, ackFnArgs});
+      const messageId = await this.saveMessage(targetClientId, {usageCount: 1, event, args, ackFnName, ackFnArgs});
 
       if (!messageId) throw new Error('saveMessage function must return a message ID');
 
@@ -118,13 +118,22 @@ class P2pServerCoreApi {
   }
 
   sendSavedMessages(targetClientId) {
-    if (typeof this.loadMessages !== 'function' || typeof this.deleteMessage !== 'function') return;
+    const missingFunctionError = this.checkRequiredFunctions();
+    if (missingFunctionError) throw missingFunctionError;
 
     (async () => {
       const savedMessages = await this.loadMessages(targetClientId);
 
       if (!savedMessages || savedMessages.length === 0) return;
-      savedMessages.forEach(({_id, event, args, ackFnName, ackFnArgs}) => {
+      savedMessages.forEach(({_id, usageCount, event, args, ackFnName, ackFnArgs}) => {
+        if (usageCount > 1) {
+          const warning = `Warning: a message of event ${event} was sent by emitToPersistent ${usageCount} times, ` +
+              `remember to call the ack function on receiver side to delete sent message`;
+          console.warn(warning);
+        }
+
+        this.updateMessage(targetClientId, _id, {usageCount: usageCount + 1});
+
         this.emitTo(targetClientId, event, ...args, (...targetClientCallbackArgs) => {
           this.deleteMessage(targetClientId, _id);
 
@@ -141,6 +150,13 @@ class P2pServerCoreApi {
         });
       });
     })();
+  }
+
+  checkRequiredFunctions() {
+    if (typeof this.saveMessage !== 'function' || typeof this.deleteMessage !== 'function'
+        || typeof this.loadMessages !== 'function' || typeof this.updateMessage !== 'function') {
+      return new Error('You must provide all 4 functions: saveMessage, deleteMessage, loadMessages, updateMessage');
+    }
   }
 
   createListeners(io, socket, clientId) {

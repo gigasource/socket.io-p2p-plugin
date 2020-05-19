@@ -40,6 +40,19 @@ function loadMessages(targetClientId) {
   return loadFromDb(targetClientId);
 }
 
+function updateMessage(targetClientId, _id, update) {
+  let savedMessages = loadFromDb(targetClientId);
+  savedMessages = savedMessages.map(message => {
+    if (message._id === _id) {
+      return Object.assign(message, update);
+    } else {
+      return message;
+    }
+  });
+
+  saveToDb(targetClientId, savedMessages);
+}
+
 describe('Server Core API', function () {
   const numberOfClients = 3;
 
@@ -47,7 +60,7 @@ describe('Server Core API', function () {
   let server;
 
   before(async function () {
-    server = startServer({saveMessage, loadMessages, deleteMessage});
+    server = startServer({saveMessage, loadMessages, deleteMessage, updateMessage});
   });
 
   after(function () {
@@ -379,7 +392,7 @@ describe('Server Core API', function () {
           }
         });
         it('should disconnect old client and add new client with duplicated clientId if clientOverwrite === true', function (done) {
-          const testServer = startServer({saveMessage, loadMessages, deleteMessage, clientOverwrite: true});
+          const testServer = startServer({saveMessage, loadMessages, deleteMessage, updateMessage, clientOverwrite: true});
           const clientId = uuidv1();
           const testEvent = 'createNews';
           let result = 0;

@@ -145,6 +145,7 @@ class ServerSideDuplex extends Duplex {
           break;
         case SOCKET_EVENT.TARGET_DISCONNECT:
           this.onTargetDisconnect(args);
+          break;
       }
     };
 
