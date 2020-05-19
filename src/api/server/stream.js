@@ -1,6 +1,7 @@
 const {SOCKET_EVENT, SERVER_CONFIG: {SERVER_SIDE_SOCKET_ID_POSTFIX}} = require('../../util/constants');
 const {Duplex} = require('stream');
 const uuidv1 = require('uuid/v1');
+const streamConnections = new Set();
 
 class P2pServerStreamApi {
   constructor(coreApi) {
@@ -13,32 +14,9 @@ class P2pServerStreamApi {
       connectionInfo.sourceClientId = clientId;
 
       const targetClientSocket = this.coreApi.getSocketByClientId(targetClientId);
-      if (!targetClientSocket) {
-        callback(`Client ${targetClientId} is not registered to server`);
-        return;
-      }
+      if (!targetClientSocket) return callback(`Client ${targetClientId} is not connected to server`);
 
-      const disconnectListener = (sk, clientId) => {
-        if (sk) sk.emit(SOCKET_EVENT.TARGET_DISCONNECT, clientId);
-      }
-      const sourceDisconnectListener = disconnectListener.bind(null, targetClientSocket, clientId); // If source disconnects -> notify target
-      const targetDisconnectListener = disconnectListener.bind(null, socket, targetClientId); // If target disconnects -> notify source
-
-      socket.once('disconnect', () => {
-        sourceDisconnectListener();
-
-        if (targetClientId.endsWith(SERVER_SIDE_SOCKET_ID_POSTFIX)) return; // server-side sockets are not added to client list -> ignore
-        if (!targetClientSocket) {
-          this.coreApi.emitError(socket, new Error(`Could not find target client '${targetClientId}' socket`));
-          return;
-        }
-
-        targetClientSocket.off('disconnect', targetDisconnectListener);
-      });
-      targetClientSocket.once('disconnect', () => {
-        targetDisconnectListener();
-        if (socket) socket.off('disconnect', sourceDisconnectListener);
-      });
+      this.coreApi.addTargetDisconnectListeners(socket, targetClientSocket, clientId, targetClientId);
 
       targetClientSocket.emit(SOCKET_EVENT.CREATE_STREAM, connectionInfo, callback);
     });
@@ -150,11 +128,13 @@ class ServerSideDuplex extends Duplex {
     };
 
     this.removeSocketListeners = () => {
+      // streamConnections.remove(this.targetStreamId);
       this.socket.off(SOCKET_EVENT.P2P_EMIT_ACKNOWLEDGE, this.clientEmitDataHandler);
       this.socket.off('disconnect', this.onDisconnect);
     }
 
     this.addSocketListeners = () => {
+      // streamConnections.add(this.targetStreamId);
       this.socket.on(SOCKET_EVENT.P2P_EMIT_ACKNOWLEDGE, this.clientEmitDataHandler);
       this.socket.once('disconnect', this.onDisconnect);
     }

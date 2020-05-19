@@ -169,11 +169,11 @@ class P2pServerCoreApi {
 
       if (!targetClientSocket) {
         if (targetClientId.endsWith(SERVER_SIDE_SOCKET_ID_POSTFIX)) return; // server-side sockets are not added to client list -> ignore
-        const error = new Error(`Could not find target client '${targetClientId}' socket`);
 
         if (kareem.hasHooks(POST_EMIT_TO)) {
-          kareem.execPost(POST_EMIT_TO, null, [targetClientId, event, args], err => err & this.emitError(socket, error));
+          kareem.execPost(POST_EMIT_TO, null, [targetClientId, event, args], err => err & this.emitError(socket, err));
         } else {
+          const error = new Error(`Client ${targetClientId} is not connected to server`);
           this.emitError(socket, error);
         }
       } else {
@@ -193,6 +193,27 @@ class P2pServerCoreApi {
     socket.on(SOCKET_EVENT.EMIT_ROOM, (roomName, event, ...args) => {
       socket.to(roomName).emit(event, ...args)
     });
+  }
+
+  addTargetDisconnectListeners(socket, targetClientSocket, clientId, targetClientId) {
+    let sourceDisconnectListener, targetDisconnectListener;
+
+    sourceDisconnectListener = () => {
+      if (targetClientSocket) {
+        targetClientSocket.emit(SOCKET_EVENT.TARGET_DISCONNECT, clientId);
+        targetClientSocket.off('disconnect', targetDisconnectListener);
+      }
+    } // If source disconnects -> notify target
+
+    targetDisconnectListener = () => {
+      if (socket) {
+        socket.emit(SOCKET_EVENT.TARGET_DISCONNECT, targetClientId);
+        socket.off('disconnect', sourceDisconnectListener);
+      }
+    } // If target disconnects -> notify source
+
+    socket.once('disconnect', sourceDisconnectListener);
+    targetClientSocket.once('disconnect', targetDisconnectListener);
   }
 
   initSocketBasedApis(socket) {

@@ -8,32 +8,9 @@ class P2pServerMessageApi {
   createListeners(socket, clientId) {
     socket.on(SOCKET_EVENT.ADD_TARGET, (targetClientId, callback) => {
       const targetClientSocket = this.coreApi.getSocketByClientId(targetClientId);
-      if (!targetClientSocket) {
-        callback(`Client ${targetClientId} is not registered to server`);
-        return;
-      }
+      if (!targetClientSocket) return callback(`Client ${targetClientId} is not connected to server`);
 
-      const disconnectListener = (sk, clientId) => {
-        if (sk) sk.emit(SOCKET_EVENT.TARGET_DISCONNECT, clientId);
-      }
-      const sourceDisconnectListener = disconnectListener.bind(null, targetClientSocket, clientId); // If source disconnects -> notify target
-      const targetDisconnectListener = disconnectListener.bind(null, socket, targetClientId); // If target disconnects -> notify source
-
-      socket.once('disconnect', () => {
-        sourceDisconnectListener();
-
-        if (targetClientId.endsWith(SERVER_SIDE_SOCKET_ID_POSTFIX)) return; // server-side sockets are not added to client list -> ignore
-        if (!targetClientSocket) {
-          this.coreApi.emitError(socket, new Error(`Could not find target client '${targetClientId}' socket`));
-          return;
-        }
-
-        targetClientSocket.off('disconnect', targetDisconnectListener);
-      });
-      targetClientSocket.once('disconnect', () => {
-        targetDisconnectListener();
-        if (socket) socket.off('disconnect', sourceDisconnectListener);
-      });
+      this.coreApi.addTargetDisconnectListeners(socket, targetClientSocket, clientId, targetClientId);
 
       targetClientSocket.emit(SOCKET_EVENT.ADD_TARGET, clientId, callback);
     });
