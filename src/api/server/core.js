@@ -119,7 +119,7 @@ class P2pServerCoreApi {
 
   sendSavedMessages(targetClientId) {
     const missingFunctionError = this.checkRequiredFunctions();
-    if (missingFunctionError) throw missingFunctionError;
+    if (missingFunctionError) return;
 
     (async () => {
       const savedMessages = await this.loadMessages(targetClientId);
@@ -143,8 +143,7 @@ class P2pServerCoreApi {
             ackFunctions.forEach(fn => fn(...(ackFnArgs.concat(targetClientCallbackArgs))));
           } else {
             if (kareem.hasHooks(POST_EMIT_TO_PERSISTENT_ACK)) {
-              kareem.execPost(POST_EMIT_TO_PERSISTENT_ACK, null, [ackFnName, ackFnArgs.concat(targetClientCallbackArgs)], () => {
-              });
+              kareem.execPost(POST_EMIT_TO_PERSISTENT_ACK, null, [ackFnName, ackFnArgs.concat(targetClientCallbackArgs)], () => {});
             }
           }
         });
@@ -155,7 +154,7 @@ class P2pServerCoreApi {
   checkRequiredFunctions() {
     if (typeof this.saveMessage !== 'function' || typeof this.deleteMessage !== 'function'
         || typeof this.loadMessages !== 'function' || typeof this.updateMessage !== 'function') {
-      return new Error('You must provide all 4 functions: saveMessage, deleteMessage, loadMessages, updateMessage');
+      return new Error('You must provide all 4 functions: saveMessage, deleteMessage, loadMessages, updateMessage to use emiToPersistent');
     }
   }
 
