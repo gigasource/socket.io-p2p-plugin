@@ -230,6 +230,20 @@ describe('Stream API for p2p server as p2p client', function () {
         expect(clientDuplex.destroyed).to.equal(true);
         expect(serverDuplex.destroyed).to.equal(true);
       });
+      it('should remove virtual client id when destroyed', async function () {
+        let clientDuplex, serverDuplex;
+        client1.onAddP2pStream({}, () => {});
+        serverDuplex = await server.addStreamAsClient(client1.clientId, {});
+
+        expect(server.virtualClients).to.have.lengthOf(1);
+        expect(server.virtualClients.has(serverDuplex.sourceClientId)).to.equal(true);
+
+        serverDuplex.destroy();
+        await wait(50);
+
+        expect(server.virtualClients).to.have.lengthOf(0);
+        expect(server.virtualClients.has(serverDuplex.sourceClientId)).to.equal(false);
+      });
     });
   });
 });
