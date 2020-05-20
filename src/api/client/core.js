@@ -5,7 +5,6 @@ class P2pClientCoreApi {
   constructor(socket, clientId) {
     this.socket = socket;
     this.clientId = clientId;
-    this.subscribedTopics = new Set();
 
     this.socket.on(SOCKET_EVENT.SERVER_ERROR, (err) => console.error(`Error sent from server to client '${this.clientId}': ${err}`));
   }

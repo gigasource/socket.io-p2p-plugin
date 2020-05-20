@@ -3,8 +3,10 @@ const P2pServerMessageApi = require('./api/server/message');
 const P2pServerStreamApi = require('./api/server/stream');
 const P2pServerServiceApi = require('./api/server/service');
 const {SOCKET_EVENT: {SERVER_ERROR}} = require('./util/constants');
+const Kareem = require('kareem');
 
 module.exports = function p2pServerPlugin(io, options = {}) {
+  io.kareem = new Kareem();
   const {clientOverwrite = false} = options;
   const p2pServerCoreApi = new P2pServerCoreApi(io, options);
   const p2pServerMessageApi = new P2pServerMessageApi(p2pServerCoreApi);
@@ -49,8 +51,10 @@ module.exports = function p2pServerPlugin(io, options = {}) {
     registerAckFunction: p2pServerCoreApi.registerAckFunction.bind(p2pServerCoreApi),
     unregisterAckFunction: p2pServerCoreApi.unregisterAckFunction.bind(p2pServerCoreApi),
     ackFunctions: p2pServerCoreApi.ackFunctions,
+    virtualClients: p2pServerCoreApi.virtualClients,
     $emit: p2pServerCoreApi.ee.emit.bind(p2pServerCoreApi.ee),
     $on: p2pServerCoreApi.ee.on.bind(p2pServerCoreApi.ee),
+    $off: p2pServerCoreApi.ee.off.bind(p2pServerCoreApi.ee),
     $once: p2pServerCoreApi.ee.once.bind(p2pServerCoreApi.ee),
 
     provideService: p2pServerServiceApi.provideService.bind(p2pServerServiceApi),

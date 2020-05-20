@@ -1,5 +1,7 @@
 const {Duplex} = require('stream');
-const {SOCKET_EVENT} = require('../../util/constants');
+const {
+  SOCKET_EVENT: {CREATE_STREAM, P2P_EMIT_STREAM, STREAM_IDENTIFIER_PREFIX, PEER_STREAM_DESTROYED, TARGET_DISCONNECT},
+} = require('../../util/constants');
 const uuidv1 = require('uuid/v1');
 
 class P2pClientStreamApi {
@@ -9,7 +11,7 @@ class P2pClientStreamApi {
     this.clientId = p2pMultiMessageApi.clientId;
 
     // returns false if client haven't used onAddP2pStream function -> notify peer that this client is not ready
-    this.socket.on(SOCKET_EVENT.CREATE_STREAM, (connectionInfo, serverCallback) => {
+    this.socket.on(CREATE_STREAM, (connectionInfo, serverCallback) => {
       serverCallback(`Client ${this.clientId} is not ready for streaming, onAddP2pStream function is required`);
     });
   }
@@ -25,7 +27,7 @@ class P2pClientStreamApi {
     };
 
     if (callback) {
-      this.socket.emit(SOCKET_EVENT.CREATE_STREAM, connectionInfo, (err) => {
+      this.socket.emit(CREATE_STREAM, connectionInfo, (err) => {
         if (err) return callback(err);
 
         const duplex = this.createClientStream(connectionInfo, duplexOpts);
@@ -33,7 +35,7 @@ class P2pClientStreamApi {
       });
     } else {
       return new Promise((resolve, reject) => {
-        this.socket.emit(SOCKET_EVENT.CREATE_STREAM, connectionInfo, (err) => {
+        this.socket.emit(CREATE_STREAM, connectionInfo, (err) => {
           if (err) return reject(err);
 
           const duplex = this.createClientStream(connectionInfo, duplexOpts);
@@ -45,7 +47,7 @@ class P2pClientStreamApi {
 
   onAddP2pStream(duplexOptions, clientCallback) {
     this.offAddP2pStream();
-    this.socket.on(SOCKET_EVENT.CREATE_STREAM, (connectionInfo, serverCallback) => {
+    this.socket.on(CREATE_STREAM, (connectionInfo, serverCallback) => {
       [connectionInfo.sourceClientId, connectionInfo.targetClientId] = [connectionInfo.targetClientId, connectionInfo.sourceClientId];
       [connectionInfo.sourceStreamId, connectionInfo.targetStreamId] = [connectionInfo.targetStreamId, connectionInfo.sourceStreamId];
 
@@ -56,7 +58,7 @@ class P2pClientStreamApi {
   }
 
   offAddP2pStream() {
-    this.socket.off(SOCKET_EVENT.CREATE_STREAM);
+    this.socket.off(CREATE_STREAM);
   }
 
   createClientStream(connectionInfo, options = {}) {
@@ -98,19 +100,17 @@ class P2pClientStreamApi {
     }
 
     const addSocketListeners = () => {
-      const emitEvent = `${SOCKET_EVENT.P2P_EMIT_STREAM}${SOCKET_EVENT.STREAM_IDENTIFIER_PREFIX}${targetStreamId}`;
-      this.socket.on(emitEvent, onReceiveStreamData);
-      this.socket.on(SOCKET_EVENT.PEER_STREAM_DESTROYED, onTargetStreamDestroyed);
+      this.socket.on(P2P_EMIT_STREAM + STREAM_IDENTIFIER_PREFIX + targetStreamId, onReceiveStreamData);
+      this.socket.on(PEER_STREAM_DESTROYED, onTargetStreamDestroyed);
       this.socket.once('disconnect', onDisconnect);
-      this.socket.on(SOCKET_EVENT.TARGET_DISCONNECT, onTargetDisconnect);
+      this.socket.on(TARGET_DISCONNECT, onTargetDisconnect);
     }
 
     const removeSocketListeners = () => {
-      const emitEvent = `${SOCKET_EVENT.P2P_EMIT_STREAM}${SOCKET_EVENT.STREAM_IDENTIFIER_PREFIX}${targetStreamId}`;
-      this.socket.off(emitEvent);
-      this.socket.off(SOCKET_EVENT.PEER_STREAM_DESTROYED, onTargetStreamDestroyed);
+      this.socket.off(P2P_EMIT_STREAM + STREAM_IDENTIFIER_PREFIX + targetStreamId);
+      this.socket.off(PEER_STREAM_DESTROYED, onTargetStreamDestroyed);
       this.socket.off('disconnect', onDisconnect);
-      this.socket.off(SOCKET_EVENT.TARGET_DISCONNECT, onTargetDisconnect);
+      this.socket.off(TARGET_DISCONNECT, onTargetDisconnect);
     }
 
     addSocketListeners();
@@ -130,7 +130,7 @@ class P2pClientStreamApi {
 
     // Writable stream handlers & events
     duplex._write = (chunk, encoding, callback) => {
-      const eventName = `${SOCKET_EVENT.P2P_EMIT_STREAM}${SOCKET_EVENT.STREAM_IDENTIFIER_PREFIX}${sourceStreamId}`;
+      const eventName = P2P_EMIT_STREAM + STREAM_IDENTIFIER_PREFIX + sourceStreamId;
       this.p2pClientMessageApi.emitTo(targetClientId, eventName, chunk, callback);
     };
 
@@ -141,7 +141,7 @@ class P2pClientStreamApi {
 
     duplex._destroy = () => {
       removeSocketListeners();
-      this.p2pClientMessageApi.emitTo(targetClientId, SOCKET_EVENT.PEER_STREAM_DESTROYED, sourceStreamId);
+      this.p2pClientMessageApi.emitTo(targetClientId, PEER_STREAM_DESTROYED, sourceStreamId);
     };
 
     return duplex;

@@ -1,4 +1,4 @@
-const {SOCKET_EVENT, SERVER_CONFIG: {SERVER_SIDE_SOCKET_ID_POSTFIX}} = require('../../util/constants');
+const {SOCKET_EVENT: {ADD_TARGET}, SERVER_CONFIG: {SERVER_SIDE_SOCKET_ID_POSTFIX}} = require('../../util/constants');
 
 class P2pServerMessageApi {
   constructor(coreApi) {
@@ -6,13 +6,13 @@ class P2pServerMessageApi {
   }
 
   createListeners(socket, clientId) {
-    socket.on(SOCKET_EVENT.ADD_TARGET, (targetClientId, callback) => {
+    socket.on(ADD_TARGET, (targetClientId, callback) => {
       const targetClientSocket = this.coreApi.getSocketByClientId(targetClientId);
       if (!targetClientSocket) return callback(`Client ${targetClientId} is not connected to server`);
 
       this.coreApi.addTargetDisconnectListeners(socket, targetClientSocket, clientId, targetClientId);
 
-      targetClientSocket.emit(SOCKET_EVENT.ADD_TARGET, clientId, callback);
+      targetClientSocket.emit(ADD_TARGET, clientId, callback);
     });
   }
 }

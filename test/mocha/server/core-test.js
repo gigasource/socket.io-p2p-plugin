@@ -84,8 +84,7 @@ describe('Server Core API', function () {
     it('should create necessary event listeners for each socket', function () {
       Object.keys(server.sockets.sockets).forEach((key) => {
         const socket = server.sockets.sockets[key];
-        expect(socket.listeners(SOCKET_EVENT.P2P_EMIT)).to.have.length(1);
-        expect(socket.listeners(SOCKET_EVENT.P2P_EMIT_ACKNOWLEDGE)).to.have.length(1);
+        expect(socket.listeners(SOCKET_EVENT.P2P_EMIT)).to.have.length(2);
         expect(socket.listeners(SOCKET_EVENT.JOIN_ROOM)).to.have.length(1);
         expect(socket.listeners(SOCKET_EVENT.LEAVE_ROOM)).to.have.length(1);
         expect(socket.listeners(SOCKET_EVENT.EMIT_ROOM)).to.have.length(1);

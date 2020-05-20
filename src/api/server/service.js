@@ -1,4 +1,4 @@
-const {SOCKET_EVENT} = require('../../util/constants');
+const {SOCKET_EVENT: {CHECK_API_NAME, CREATE_API, DESTROY_API, USE_API}} = require('../../util/constants');
 
 class P2pServerServiceApi {
   constructor() {
@@ -17,20 +17,20 @@ class P2pServerServiceApi {
       }
     }
 
-    socket.on(SOCKET_EVENT.CHECK_API_NAME, (apiName, callback) => {
+    socket.on(CHECK_API_NAME, (apiName, callback) => {
       callback(!!this.serviceApis[apiName]);
     });
 
-    socket.on(SOCKET_EVENT.CREATE_API, apiName => {
+    socket.on(CREATE_API, apiName => {
       this.serviceApis[apiName] = {
         clientId: socket.clientId,
         fn: (...args) => socket.emit(apiName, ...args)
       }
     });
 
-    socket.on(SOCKET_EVENT.DESTROY_API, destroyApi);
+    socket.on(DESTROY_API, destroyApi);
 
-    socket.on(SOCKET_EVENT.USE_API, (apiName, ...args) => {
+    socket.on(USE_API, (apiName, ...args) => {
       const {fn: handlerFunction} = this.serviceApis[apiName];
       if (handlerFunction) handlerFunction.apply(null, args);
     });

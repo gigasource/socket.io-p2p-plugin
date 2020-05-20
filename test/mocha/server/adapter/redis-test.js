@@ -12,6 +12,7 @@ db.defaults({savedMessages: {}}).write();
 const uuidv1 = require('uuid/v1');
 const socketClient = require('socket.io-client');
 const socketClientPlugin = require('../../../../src/p2p-client-plugin');
+const streamify = require('stream-array');
 
 function saveToDb(targetClientId, value) {
   db.set(`savedMessages.${targetClientId}`, value).write();
@@ -40,13 +41,26 @@ function loadMessages(targetClientId) {
   return loadFromDb(targetClientId);
 }
 
+function updateMessage(targetClientId, _id, update) {
+  let savedMessages = loadFromDb(targetClientId);
+  savedMessages = savedMessages.map(message => {
+    if (message._id === _id) {
+      return Object.assign(message, update);
+    } else {
+      return message;
+    }
+  });
+
+  saveToDb(targetClientId, savedMessages);
+}
+
 describe('Redis adapter test', function () {
   let server1, server2;
   let client1, client2;
 
   before(async function () {
-    server1 = startServer({saveMessage, loadMessages, deleteMessage, redisTest: true});
-    server2 = startServer({saveMessage, loadMessages, deleteMessage, redisTest: true});
+    server1 = startServer({saveMessage, loadMessages, deleteMessage, updateMessage, redisTest: true});
+    server2 = startServer({saveMessage, loadMessages, deleteMessage, updateMessage, redisTest: true});
   });
 
   after(function () {
@@ -205,6 +219,78 @@ describe('Redis adapter test', function () {
         });
       });
     });
+    describe('server side stream', function () {
+      it('should be able to send data between nodes', function () {
+
+      });
+    });
+    describe('Server Stream API', function () {
+      // client1 is connected to server1, client2 - server2
+      it('should be able to transfer data to target client if client is connected to another server in cluster', async function () {
+        let serverDuplex, clientDuplex;
+
+        const result = [];
+        client2.onAddP2pStream({}, d => clientDuplex = d);
+        serverDuplex = await server1.addStreamAsClient(client2.clientId);
+
+        clientDuplex.on('data', chunk => result.push(chunk.toString()));
+        const inputArr = [...new Array(40)].map(() => Math.round(Math.random() * 100) + '');
+        streamify(inputArr).pipe(serverDuplex);
+
+        await wait(400);
+        expect(result).to.have.lengthOf(inputArr.length);
+        expect(result[0]).to.equal(inputArr[0]);
+        expect(result[result.length - 1]).to.equal(inputArr[result.length - 1]);
+      });
+      it('should be able to receive data from target client if client is connected to another server in cluster', async function () {
+        let serverDuplex, clientDuplex;
+
+        const result = [];
+        client2.onAddP2pStream({}, d => clientDuplex = d);
+        serverDuplex = await server1.addStreamAsClient(client2.clientId);
+
+        serverDuplex.on('data', chunk => result.push(chunk.toString()));
+        const inputArr = [...new Array(40)].map(() => Math.round(Math.random() * 100) + '');
+        streamify(inputArr).pipe(clientDuplex);
+
+        await wait(400);
+        expect(result).to.have.lengthOf(inputArr.length);
+        expect(result[0]).to.equal(inputArr[0]);
+        expect(result[result.length - 1]).to.equal(inputArr[result.length - 1]);
+      });
+      it('should be able to transfer data to target client if client is connected directly to server', async function () {
+        let serverDuplex, clientDuplex;
+
+        const result = [];
+        client1.onAddP2pStream({}, d => clientDuplex = d);
+        serverDuplex = await server1.addStreamAsClient(client1.clientId);
+
+        clientDuplex.on('data', chunk => result.push(chunk.toString()));
+        const inputArr = [...new Array(40)].map(() => Math.round(Math.random() * 100) + '');
+        streamify(inputArr).pipe(serverDuplex);
+
+        await wait(200);
+        expect(result).to.have.lengthOf(inputArr.length);
+        expect(result[0]).to.equal(inputArr[0]);
+        expect(result[result.length - 1]).to.equal(inputArr[result.length - 1]);
+      });
+      it('should be able to receive data from target client if client is connected directly to server', async function () {
+        let serverDuplex, clientDuplex;
+
+        const result = [];
+        client1.onAddP2pStream({}, d => clientDuplex = d);
+        serverDuplex = await server1.addStreamAsClient(client1.clientId);
+
+        serverDuplex.on('data', chunk => result.push(chunk.toString()));
+        const inputArr = [...new Array(40)].map(() => Math.round(Math.random() * 100) + '');
+        streamify(inputArr).pipe(clientDuplex);
+
+        await wait(200);
+        expect(result).to.have.lengthOf(inputArr.length);
+        expect(result[0]).to.equal(inputArr[0]);
+        expect(result[result.length - 1]).to.equal(inputArr[result.length - 1]);
+      });
+    })
     describe('clients between nodes', function () {
       it('should be able to send p2p messages ', function (done) {
         const testEvent = uuidv1();
@@ -225,21 +311,6 @@ describe('Redis adapter test', function () {
           done();
         });
       });
-      /*it('should be able to send data through stream', async function () {
-        let duplex1, duplex2;
-        const result = [];
-        client2.onAddP2pStream({}, d => duplex2 = d);
-        duplex1 = await client1.addP2pStream(client2.clientId, {});
-
-        duplex2.on('data', chunk => result.push(chunk.toString()));
-        const inputArr = [...new Array(40)].map(() => Math.round(Math.random() * 100) + '');
-        streamify(inputArr).pipe(duplex1);
-
-        await wait(200);
-        expect(result).to.have.lengthOf(inputArr.length);
-        expect(result[0]).to.equal(inputArr[0]);
-        expect(result[result.length - 1]).to.equal(inputArr[result.length - 1]);
-      });*/
     });
   });
 });

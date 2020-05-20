@@ -1,14 +1,27 @@
 const {
-  SOCKET_EVENT, SERVER_CONFIG: {SERVER_SIDE_SOCKET_ID_POSTFIX},
+  SOCKET_EVENT: {SERVER_ERROR, TARGET_DISCONNECT, JOIN_ROOM, LEAVE_ROOM, EMIT_ROOM, P2P_EMIT, LIST_CLIENTS},
+  SERVER_CONFIG: {SERVER_SIDE_SOCKET_ID_POSTFIX},
   HOOK_NAME: {POST_EMIT_TO, POST_EMIT_TO_PERSISTENT_ACK},
 } = require('../../util/constants');
 const findKey = require('lodash/findKey');
 const EventEmitter = require('events');
-const kareem = require('../../util/hooks');
 
 class P2pServerCoreApi {
   constructor(io, options) {
+    /*
+      clientMap is an object of connected clients with key = clientId & value = socket.id
+      Example: { clientA: '<id of connected socket>' }
+     */
     this.clientMap = {};
+
+    /*
+      virtualClients is a Set of server-created clientIds without real socket
+      Example: [ 'clientA--server-side', 'clientB--server-side' ]
+      These are used for reusing p2p code of client-server-client scenario for client-server scenario
+      -> client will act as if they are communicating with another client in client-server scenario
+      see addStreamAsClient function in Server Stream API for example
+     */
+    this.virtualClients = new Set();
     this.io = io;
     this.ee = new EventEmitter();
 
@@ -59,15 +72,15 @@ class P2pServerCoreApi {
   // Socket-related functions
   emitError(socket, err) {
     console.error(`Error occurred on server: from client '${this.getClientIdBySocketId(socket.id)}': ${err}`);
-    socket.emit(SOCKET_EVENT.SERVER_ERROR, err.toString());
+    socket.emit(SERVER_ERROR, err.toString());
   }
 
   emitTo(targetClientId, event, ...args) {
     const targetClientSocket = this.getSocketByClientId(targetClientId);
 
     if (!targetClientSocket) {
-      if (kareem.hasHooks(POST_EMIT_TO)) {
-        kareem.execPost(POST_EMIT_TO, null, [targetClientId, event, args], err => console.error(err));
+      if (this.io.kareem.hasHooks(POST_EMIT_TO)) {
+        this.io.kareem.execPost(POST_EMIT_TO, null, [targetClientId, event, args], err => console.error(err));
       } else {
         console.error((`Client ${targetClientId} is not connected to server`));
       }
@@ -142,8 +155,9 @@ class P2pServerCoreApi {
           if (ackFunctions.length > 0) {
             ackFunctions.forEach(fn => fn(...(ackFnArgs.concat(targetClientCallbackArgs))));
           } else {
-            if (kareem.hasHooks(POST_EMIT_TO_PERSISTENT_ACK)) {
-              kareem.execPost(POST_EMIT_TO_PERSISTENT_ACK, null, [ackFnName, ackFnArgs.concat(targetClientCallbackArgs)], () => {});
+            if (this.io.kareem.hasHooks(POST_EMIT_TO_PERSISTENT_ACK)) {
+              this.io.kareem.execPost(POST_EMIT_TO_PERSISTENT_ACK, null, [ackFnName, ackFnArgs.concat(targetClientCallbackArgs)], () => {
+              });
             }
           }
         });
@@ -163,16 +177,16 @@ class P2pServerCoreApi {
       this.removeClient(clientId);
     });
 
-    const p2pEmitListener = ({targetClientId, event, args}, acknowledgeFn) => {
-      if (acknowledgeFn) args.push(acknowledgeFn); // if event === P2P_EMIT_ACKNOWLEDGE
+    const p2pEmitListener = (targetClientId, event, args, acknowledgeFn) => {
+      if (acknowledgeFn) args.push(acknowledgeFn);
       const targetClientSocket = this.getSocketByClientId(targetClientId);
 
       if (!targetClientSocket) {
-        if (targetClientId.endsWith(SERVER_SIDE_SOCKET_ID_POSTFIX)) return; // server-side sockets are not added to client list -> ignore
-
-        if (kareem.hasHooks(POST_EMIT_TO)) {
-          kareem.execPost(POST_EMIT_TO, null, [targetClientId, event, args], err => err & this.emitError(socket, err));
+        if (this.io.kareem.hasHooks(POST_EMIT_TO)) {
+          this.io.kareem.execPost(POST_EMIT_TO, null, [targetClientId, event, args], err => err & this.emitError(socket, err));
         } else {
+          if (targetClientId.endsWith(SERVER_SIDE_SOCKET_ID_POSTFIX)) return;
+
           const error = new Error(`Client ${targetClientId} is not connected to server`);
           this.emitError(socket, error);
         }
@@ -181,16 +195,15 @@ class P2pServerCoreApi {
       }
     };
 
-    socket.on(SOCKET_EVENT.P2P_EMIT, p2pEmitListener);
-    socket.on(SOCKET_EVENT.P2P_EMIT_ACKNOWLEDGE, p2pEmitListener);
+    socket.on(P2P_EMIT, p2pEmitListener);
 
-    socket.on(SOCKET_EVENT.JOIN_ROOM, (roomName, callback) => {
+    socket.on(JOIN_ROOM, (roomName, callback) => {
       socket.join(roomName, callback);
     });
-    socket.on(SOCKET_EVENT.LEAVE_ROOM, (roomName, callback) => {
+    socket.on(LEAVE_ROOM, (roomName, callback) => {
       socket.leave(roomName, callback);
     });
-    socket.on(SOCKET_EVENT.EMIT_ROOM, (roomName, event, ...args) => {
+    socket.on(EMIT_ROOM, (roomName, event, ...args) => {
       socket.to(roomName).emit(event, ...args)
     });
   }
@@ -200,14 +213,14 @@ class P2pServerCoreApi {
 
     sourceDisconnectListener = () => {
       if (targetClientSocket) {
-        targetClientSocket.emit(SOCKET_EVENT.TARGET_DISCONNECT, clientId);
+        targetClientSocket.emit(TARGET_DISCONNECT, clientId);
         targetClientSocket.off('disconnect', targetDisconnectListener);
       }
     } // If source disconnects -> notify target
 
     targetDisconnectListener = () => {
       if (socket) {
-        socket.emit(SOCKET_EVENT.TARGET_DISCONNECT, targetClientId);
+        socket.emit(TARGET_DISCONNECT, targetClientId);
         socket.off('disconnect', sourceDisconnectListener);
       }
     } // If target disconnects -> notify source
@@ -217,7 +230,7 @@ class P2pServerCoreApi {
   }
 
   initSocketBasedApis(socket) {
-    // socket.on(SOCKET_EVENT.LIST_CLIENTS, clientCallbackFn => clientCallbackFn(this.getAllClientId()));
+    // socket.on(LIST_CLIENTS, clientCallbackFn => clientCallbackFn(this.getAllClientId()));
   }
 }
 

@@ -1,15 +1,43 @@
-const {SOCKET_EVENT, SERVER_CONFIG: {SERVER_SIDE_SOCKET_ID_POSTFIX}} = require('../../util/constants');
+const {
+  SOCKET_EVENT: {
+    P2P_EMIT_STREAM, PEER_STREAM_DESTROYED, TARGET_DISCONNECT, P2P_EMIT, CREATE_STREAM,
+    STREAM_IDENTIFIER_PREFIX,
+  },
+  INTERNAL_EMITTER_EVENT: {DATA_FROM_ANOTHER_SERVER},
+  SERVER_CONFIG: {SERVER_SIDE_SOCKET_ID_POSTFIX}
+} = require('../../util/constants');
 const {Duplex} = require('stream');
 const uuidv1 = require('uuid/v1');
-const streamConnections = new Set();
 
 class P2pServerStreamApi {
   constructor(coreApi) {
     this.coreApi = coreApi;
+    // stream for cluster environment, data will be received from adapter (currently only supports Redis)
+    this.coreApi.ee.on(DATA_FROM_ANOTHER_SERVER, (targetClientId, event, ...args) => {
+      const ackFn = args.pop();
+      this.streamDataHandler(targetClientId, event, args, ackFn);
+    });
   }
 
+  streamDataHandler(targetClientId, event, args, ackFn) {
+    if (!event) return;
+
+    if (event.startsWith(P2P_EMIT_STREAM)) {
+      this.coreApi.ee.emit(event, args, ackFn);
+    } else if (event === PEER_STREAM_DESTROYED) {
+      // args is id of receiver-side stream
+      this.coreApi.ee.emit(PEER_STREAM_DESTROYED + STREAM_IDENTIFIER_PREFIX + args);
+    } else if (event === TARGET_DISCONNECT) {
+      // args is id of disconnected client
+      this.coreApi.ee.emit(TARGET_DISCONNECT + STREAM_IDENTIFIER_PREFIX + args);
+    }
+  };
+
   createListeners(socket, clientId) {
-    socket.on(SOCKET_EVENT.CREATE_STREAM, (connectionInfo, callback) => {
+    socket.on(P2P_EMIT, this.streamDataHandler.bind(this));
+
+    // stream for normal socket connection
+    socket.on(CREATE_STREAM, (connectionInfo, callback) => {
       const {targetClientId} = connectionInfo;
       connectionInfo.sourceClientId = clientId;
 
@@ -18,14 +46,13 @@ class P2pServerStreamApi {
 
       this.coreApi.addTargetDisconnectListeners(socket, targetClientSocket, clientId, targetClientId);
 
-      targetClientSocket.emit(SOCKET_EVENT.CREATE_STREAM, connectionInfo, callback);
+      targetClientSocket.emit(CREATE_STREAM, connectionInfo, callback);
     });
   }
 
   addStreamAsClient(targetClientId, duplexOptions, callback) {
     const {sourceStreamId, targetStreamId, ...duplexOpts} = duplexOptions || {};
 
-    const socket = this.coreApi.getSocketByClientId(targetClientId);
     const connectionInfo = {
       sourceStreamId: sourceStreamId || uuidv1(),
       targetStreamId: targetStreamId || uuidv1(),
@@ -34,18 +61,18 @@ class P2pServerStreamApi {
     };
 
     if (callback) {
-      socket.emit(SOCKET_EVENT.CREATE_STREAM, connectionInfo, err => {
+      this.coreApi.emitTo(targetClientId, CREATE_STREAM, connectionInfo, err => {
         if (err) return callback(err);
 
-        const duplex = new ServerSideDuplex(socket, connectionInfo, duplexOpts);
+        const duplex = new ServerSideDuplex(this.coreApi, connectionInfo, duplexOpts);
         callback(duplex);
       });
     } else {
       return new Promise((resolve, reject) => {
-        socket.emit(SOCKET_EVENT.CREATE_STREAM, connectionInfo, err => {
+        this.coreApi.emitTo(targetClientId, CREATE_STREAM, connectionInfo, err => {
           if (err) return reject(err);
 
-          const duplex = new ServerSideDuplex(socket, connectionInfo, duplexOpts);
+          const duplex = new ServerSideDuplex(this.coreApi, connectionInfo, duplexOpts);
           resolve(duplex);
         });
       });
@@ -54,7 +81,7 @@ class P2pServerStreamApi {
 }
 
 class ServerSideDuplex extends Duplex {
-  constructor(socket, connectionInfo, options) {
+  constructor(coreApi, connectionInfo, options) {
     const {ignoreStreamError, ...opts} = options
 
     super(opts);
@@ -65,7 +92,9 @@ class ServerSideDuplex extends Duplex {
     this.targetStreamId = targetStreamId;
     this.sourceClientId = sourceClientId;
     this.targetClientId = targetClientId;
-    this.socket = socket;
+    this.coreApi = coreApi;
+
+    coreApi.virtualClients.add(sourceClientId);
 
     // Lifecycle handlers & events
     const duplexOnError = (err) => {
@@ -81,21 +110,10 @@ class ServerSideDuplex extends Duplex {
     this.on('error', duplexOnError);
 
     // Socket.IO Lifecycle
-    this.onDisconnect = () => {
-      if (!this.destroyed) this.destroy();
-    };
-
-    this.onTargetDisconnect = (targetClientId) => {
-      if (this.targetClientId === targetClientId) {
-        if (!this.destroyed) this.destroy();
-      }
-    };
-
-    this.onTargetStreamDestroyed = (targetStreamId) => {
-      if (this.targetStreamId === targetStreamId) {
-        if (!this.destroyed) this.destroy();
-      }
-    };
+    // Duplicates are created to use with EventEmitter's on & off functions (see below)
+    this.onDisconnect = () => !this.destroyed && this.destroy();
+    this.onTargetDisconnect = () => !this.destroyed && this.destroy();
+    this.onTargetStreamDestroyed = () => !this.destroyed && this.destroy();
 
     // Socket.IO events
     this.onReceiveStreamData = (data, callbackFn) => {
@@ -109,34 +127,22 @@ class ServerSideDuplex extends Duplex {
       }
     };
 
-    this.clientEmitDataHandler = (emitData, ackFn) => {
-      const {targetClientId, event, args} = emitData;
-      if (targetClientId !== this.sourceClientId) return;
-
-      const emitEvent = `${SOCKET_EVENT.P2P_EMIT_STREAM}${SOCKET_EVENT.STREAM_IDENTIFIER_PREFIX}${this.targetStreamId}`;
-      switch (event) {
-        case emitEvent:
-          this.onReceiveStreamData(args, ackFn);
-          break;
-        case SOCKET_EVENT.PEER_STREAM_DESTROYED:
-          this.onTargetStreamDestroyed(args);
-          break;
-        case SOCKET_EVENT.TARGET_DISCONNECT:
-          this.onTargetDisconnect(args);
-          break;
-      }
-    };
-
     this.removeSocketListeners = () => {
-      // streamConnections.remove(this.targetStreamId);
-      this.socket.off(SOCKET_EVENT.P2P_EMIT_ACKNOWLEDGE, this.clientEmitDataHandler);
-      this.socket.off('disconnect', this.onDisconnect);
+      this.coreApi.ee.off(P2P_EMIT_STREAM + STREAM_IDENTIFIER_PREFIX + this.targetStreamId, this.onReceiveStreamData);
+      this.coreApi.ee.off(PEER_STREAM_DESTROYED + STREAM_IDENTIFIER_PREFIX + this.targetStreamId, this.onTargetStreamDestroyed);
+      this.coreApi.ee.off(TARGET_DISCONNECT + STREAM_IDENTIFIER_PREFIX + this.targetClientId, this.onTargetDisconnect);
+
+      const socket = this.coreApi.getSocketByClientId(this.targetClientId);
+      if (socket) socket.off('disconnect', this.onDisconnect);
     }
 
     this.addSocketListeners = () => {
-      // streamConnections.add(this.targetStreamId);
-      this.socket.on(SOCKET_EVENT.P2P_EMIT_ACKNOWLEDGE, this.clientEmitDataHandler);
-      this.socket.once('disconnect', this.onDisconnect);
+      this.coreApi.ee.on(P2P_EMIT_STREAM + STREAM_IDENTIFIER_PREFIX + this.targetStreamId, this.onReceiveStreamData);
+      this.coreApi.ee.on(PEER_STREAM_DESTROYED + STREAM_IDENTIFIER_PREFIX + this.targetStreamId, this.onTargetStreamDestroyed);
+      this.coreApi.ee.on(TARGET_DISCONNECT + STREAM_IDENTIFIER_PREFIX + this.targetClientId, this.onTargetDisconnect);
+
+      const socket = this.coreApi.getSocketByClientId(this.targetClientId);
+      if (socket) socket.once('disconnect', this.onDisconnect);
     }
 
     this.addSocketListeners();
@@ -144,9 +150,8 @@ class ServerSideDuplex extends Duplex {
 
   // Writable stream handlers & events
   _write(chunk, encoding, callback) {
-    const eventName = `${SOCKET_EVENT.P2P_EMIT_STREAM}${SOCKET_EVENT.STREAM_IDENTIFIER_PREFIX}${this.sourceStreamId}`;
-
-    this.socket.emit(eventName, chunk, callback);
+    const eventName = P2P_EMIT_STREAM + STREAM_IDENTIFIER_PREFIX + this.sourceStreamId;
+    this.coreApi.emitTo(this.targetClientId, eventName, chunk, callback);
   };
 
   // Readable stream handlers & events
@@ -156,8 +161,9 @@ class ServerSideDuplex extends Duplex {
 
   _destroy() {
     this.removeSocketListeners();
+    this.coreApi.virtualClients.delete(this.sourceClientId);
 
-    this.socket.emit(SOCKET_EVENT.PEER_STREAM_DESTROYED, this.sourceStreamId);
+    this.coreApi.emitTo(this.targetClientId, PEER_STREAM_DESTROYED, this.sourceStreamId);
   };
 }
 

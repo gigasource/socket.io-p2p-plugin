@@ -1,7 +1,7 @@
 const chai = require('chai');
 const chaiAsPromised = require('chai-as-promised');
 const expect = chai.expect;
-const {SOCKET_EVENT: {P2P_EMIT_STREAM, STREAM_IDENTIFIER_PREFIX, PEER_STREAM_DESTROYED, TARGET_DISCONNECT, P2P_EMIT_ACKNOWLEDGE}}
+const {SOCKET_EVENT: {P2P_EMIT_STREAM, STREAM_IDENTIFIER_PREFIX, PEER_STREAM_DESTROYED, TARGET_DISCONNECT}}
     = require('../../../src/util/constants');
 const {startServer, stopServer, startClients, wait, terminateClients} = require('../common');
 const {Duplex} = require('stream');
@@ -54,7 +54,6 @@ describe('Stream API for p2p server as p2p client', function () {
         const originalCount1 = client1.listeners('disconnect').length;
         const originalCount2 = client1.listeners(TARGET_DISCONNECT).length;
         const originalCount3 = serverSocket.listeners('disconnect').length;
-        const originalCount4 = serverSocket.listeners(P2P_EMIT_ACKNOWLEDGE).length;
         let sendDataEventFromServer, sendDataEventFromClient;
 
         client1.onAddP2pStream({}, duplex => {
@@ -66,7 +65,6 @@ describe('Stream API for p2p server as p2p client', function () {
         expect(client1.listeners('disconnect')).to.have.lengthOf(originalCount1 + 1);
         expect(serverSocket.listeners('disconnect')).to.have.lengthOf(originalCount3 + 1);
         expect(client1.listeners(TARGET_DISCONNECT)).to.have.lengthOf(originalCount2 + 1);
-        expect(serverSocket.listeners(P2P_EMIT_ACKNOWLEDGE)).to.have.lengthOf(originalCount4 + 1);
         expect(client1.listeners(sendDataEventFromClient)).to.have.lengthOf(1);
         expect(client1.listeners(PEER_STREAM_DESTROYED)).to.have.lengthOf(1);
 
@@ -78,7 +76,6 @@ describe('Stream API for p2p server as p2p client', function () {
         expect(client1.listeners('disconnect')).to.have.lengthOf(originalCount1);
         expect(serverSocket.listeners('disconnect')).to.have.lengthOf(originalCount3);
         expect(client1.listeners(TARGET_DISCONNECT)).to.have.lengthOf(originalCount2);
-        expect(serverSocket.listeners(P2P_EMIT_ACKNOWLEDGE)).to.have.lengthOf(originalCount4);
         expect(client1.listeners(sendDataEventFromClient)).to.have.lengthOf(0);
         expect(client1.listeners(PEER_STREAM_DESTROYED)).to.have.lengthOf(0);
       });
