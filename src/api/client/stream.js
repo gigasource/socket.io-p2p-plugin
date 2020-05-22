@@ -46,6 +46,11 @@ class P2pClientStreamApi {
   }
 
   onAddP2pStream(duplexOptions, clientCallback) {
+    if (!clientCallback && typeof duplexOptions === 'function') {
+      clientCallback = duplexOptions;
+      duplexOptions = {};
+    }
+
     this.offAddP2pStream();
     this.socket.on(CREATE_STREAM, (connectionInfo, serverCallback) => {
       [connectionInfo.sourceClientId, connectionInfo.targetClientId] = [connectionInfo.targetClientId, connectionInfo.sourceClientId];
@@ -62,6 +67,13 @@ class P2pClientStreamApi {
   }
 
   createClientStream(connectionInfo, options = {}) {
+    if (options.onDisconnect && typeof options.onDisconnect !== 'function')
+      throw new Error('onDisconnect option must be function');
+    if (options.onTargetDisconnect && typeof options.onTargetDisconnect !== 'function')
+      throw new Error('onTargetDisconnect option must be function');
+    if (options.onTargetStreamDestroyed && typeof options.onTargetStreamDestroyed !== 'function')
+      throw new Error('onTargetStreamDestroyed option must be function');
+
     const {ignoreStreamError, ...opts} = options
 
     const {sourceStreamId, targetStreamId, targetClientId} = connectionInfo;
@@ -72,20 +84,16 @@ class P2pClientStreamApi {
     duplex.targetClientId = targetClientId;
 
     // Socket.IO Lifecycle
-    const onDisconnect = () => {
-      if (!duplex.destroyed) duplex.destroy();
+    const onDisconnect = options.onDisconnect || function () {
+      if (!duplex.destroyed) duplex.cleanup(5000);
+    };
+
+    const onTargetDisconnect = options.onTargetDisconnect || function (targetClientId) {
+      if (duplex.targetClientId === targetClientId && !duplex.destroyed) duplex.cleanup(5000);
     }
 
-    const onTargetDisconnect = targetClientId => {
-      if (duplex.targetClientId === targetClientId) {
-        if (!duplex.destroyed) duplex.destroy();
-      }
-    }
-
-    const onTargetStreamDestroyed = targetStreamId => {
-      if (duplex.targetStreamId === targetStreamId) {
-        if (!duplex.destroyed) duplex.destroy();
-      }
+    const onTargetStreamDestroyed = options.onTargetStreamDestroyed || function (targetStreamId) {
+      if (duplex.targetStreamId === targetStreamId && !duplex.destroyed) duplex.cleanup(5000);
     }
 
     // Socket.IO events
@@ -143,6 +151,25 @@ class P2pClientStreamApi {
       removeSocketListeners();
       this.p2pClientMessageApi.emitTo(targetClientId, PEER_STREAM_DESTROYED, sourceStreamId);
     };
+
+    /*
+    This is to avoid write after destroyed error
+     */
+    duplex.cleanup = timeout => {
+      let destroyTimeout;
+
+      if (timeout) {
+        if (typeof timeout !== 'number') throw new Error('timeout must be a number');
+        destroyTimeout = setTimeout(() => !duplex.destroyed && duplex.destroy(), timeout);
+      }
+
+      duplex.once('finish', () => {
+        if (!duplex.destroyed) duplex.destroy();
+        if (destroyTimeout) clearTimeout(destroyTimeout);
+      });
+
+      duplex.end();
+    }
 
     return duplex;
   }

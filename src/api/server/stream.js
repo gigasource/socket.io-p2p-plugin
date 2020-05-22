@@ -26,10 +26,10 @@ class P2pServerStreamApi {
       this.coreApi.ee.emit(event, args, ackFn);
     } else if (event === PEER_STREAM_DESTROYED) {
       // args is id of receiver-side stream
-      this.coreApi.ee.emit(PEER_STREAM_DESTROYED + STREAM_IDENTIFIER_PREFIX + args);
+      this.coreApi.ee.emit(PEER_STREAM_DESTROYED, args);
     } else if (event === TARGET_DISCONNECT) {
       // args is id of disconnected client
-      this.coreApi.ee.emit(TARGET_DISCONNECT + STREAM_IDENTIFIER_PREFIX + args);
+      this.coreApi.ee.emit(TARGET_DISCONNECT, args);
     }
   };
 
@@ -56,7 +56,7 @@ class P2pServerStreamApi {
     const connectionInfo = {
       sourceStreamId: sourceStreamId || uuidv1(),
       targetStreamId: targetStreamId || uuidv1(),
-      sourceClientId: targetClientId + SERVER_SIDE_SOCKET_ID_POSTFIX,
+      sourceClientId: uuidv1() + SERVER_SIDE_SOCKET_ID_POSTFIX,
       targetClientId: targetClientId,
     };
 
@@ -82,6 +82,13 @@ class P2pServerStreamApi {
 
 class ServerSideDuplex extends Duplex {
   constructor(coreApi, connectionInfo, options) {
+    if (options.onDisconnect && typeof options.onDisconnect !== 'function')
+      throw new Error('onDisconnect option must be function');
+    if (options.onTargetDisconnect && typeof options.onTargetDisconnect !== 'function')
+      throw new Error('onTargetDisconnect option must be function');
+    if (options.onTargetStreamDestroyed && typeof options.onTargetStreamDestroyed !== 'function')
+      throw new Error('onTargetStreamDestroyed option must be function');
+
     const {ignoreStreamError, ...opts} = options
 
     super(opts);
@@ -110,10 +117,17 @@ class ServerSideDuplex extends Duplex {
     this.on('error', duplexOnError);
 
     // Socket.IO Lifecycle
-    // Duplicates are created to use with EventEmitter's on & off functions (see below)
-    this.onDisconnect = () => !this.destroyed && this.destroy();
-    this.onTargetDisconnect = () => !this.destroyed && this.destroy();
-    this.onTargetStreamDestroyed = () => !this.destroyed && this.destroy();
+    this.onDisconnect = options.onDisconnect || (() => {
+      if (!this.destroyed) this.cleanup(5000);
+    });
+
+    this.onTargetDisconnect = options.onTargetDisconnect || (([targetClientId]) => {
+      if (this.targetClientId === targetClientId && !this.destroyed) this.cleanup(5000);
+    });
+
+    this.onTargetStreamDestroyed = options.onTargetStreamDestroyed || (([targetStreamId]) => {
+      if (this.targetStreamId === targetStreamId && !this.destroyed) this.cleanup(5000);
+    });
 
     // Socket.IO events
     this.onReceiveStreamData = (data, callbackFn) => {
@@ -129,8 +143,8 @@ class ServerSideDuplex extends Duplex {
 
     this.removeSocketListeners = () => {
       this.coreApi.ee.off(P2P_EMIT_STREAM + STREAM_IDENTIFIER_PREFIX + this.targetStreamId, this.onReceiveStreamData);
-      this.coreApi.ee.off(PEER_STREAM_DESTROYED + STREAM_IDENTIFIER_PREFIX + this.targetStreamId, this.onTargetStreamDestroyed);
-      this.coreApi.ee.off(TARGET_DISCONNECT + STREAM_IDENTIFIER_PREFIX + this.targetClientId, this.onTargetDisconnect);
+      this.coreApi.ee.off(PEER_STREAM_DESTROYED, this.onTargetStreamDestroyed);
+      this.coreApi.ee.off(TARGET_DISCONNECT, this.onTargetDisconnect);
 
       const socket = this.coreApi.getSocketByClientId(this.targetClientId);
       if (socket) socket.off('disconnect', this.onDisconnect);
@@ -138,8 +152,8 @@ class ServerSideDuplex extends Duplex {
 
     this.addSocketListeners = () => {
       this.coreApi.ee.on(P2P_EMIT_STREAM + STREAM_IDENTIFIER_PREFIX + this.targetStreamId, this.onReceiveStreamData);
-      this.coreApi.ee.on(PEER_STREAM_DESTROYED + STREAM_IDENTIFIER_PREFIX + this.targetStreamId, this.onTargetStreamDestroyed);
-      this.coreApi.ee.on(TARGET_DISCONNECT + STREAM_IDENTIFIER_PREFIX + this.targetClientId, this.onTargetDisconnect);
+      this.coreApi.ee.on(PEER_STREAM_DESTROYED, this.onTargetStreamDestroyed);
+      this.coreApi.ee.on(TARGET_DISCONNECT, this.onTargetDisconnect);
 
       const socket = this.coreApi.getSocketByClientId(this.targetClientId);
       if (socket) socket.once('disconnect', this.onDisconnect);
@@ -165,6 +179,25 @@ class ServerSideDuplex extends Duplex {
 
     this.coreApi.emitTo(this.targetClientId, PEER_STREAM_DESTROYED, this.sourceStreamId);
   };
+
+  /*
+  This is to avoid write after destroyed error
+   */
+  cleanup(timeout) {
+    let destroyTimeout;
+
+    if (timeout) {
+      if (typeof timeout !== 'number') throw new Error('timeout must be a number');
+      destroyTimeout = setTimeout(() => !this.destroyed && this.destroy(), timeout);
+    }
+
+    this.once('finish', () => {
+      if (!this.destroyed) this.destroy();
+      if (destroyTimeout) clearTimeout(destroyTimeout);
+    });
+
+    this.end();
+  }
 }
 
 module.exports = P2pServerStreamApi;

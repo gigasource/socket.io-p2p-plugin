@@ -16,7 +16,7 @@ module.exports = function (io, serverPlugin) {
   const uuid = uuidv1();
   const redisPubClient = io._adapter.pubClient;
   const redisSubClient = io._adapter.subClient;
-  const clusterClients = new Set();
+  io.clusterClients = new Set();
   const acks = {};
   const reviverFn = (key, value) => {
     if (value && value.type === 'Buffer' && Array.isArray(value.data)) return Buffer.from(value.data);
@@ -35,12 +35,12 @@ module.exports = function (io, serverPlugin) {
         // Client connection/disconnection handlers
       case CLIENT_CONNECTION_CHANNEL: {
         const clientId = JSON.parse(message);
-        clusterClients.add(clientId);
+        io.clusterClients.add(clientId);
         break;
       }
       case CLIENT_DISCONNECTION_CHANNEL: {
         const clientId = JSON.parse(message);
-        clusterClients.delete(clientId);
+        io.clusterClients.delete(clientId);
         break;
       }
 
@@ -93,7 +93,7 @@ module.exports = function (io, serverPlugin) {
   });
 
   io.kareem.post(POST_EMIT_TO, function (targetClientId, event, args, done) {
-    if (!clusterClients.has(targetClientId) && !targetClientId.endsWith(SERVER_SIDE_SOCKET_ID_POSTFIX)) {
+    if (!io.clusterClients.has(targetClientId) && !targetClientId.endsWith(SERVER_SIDE_SOCKET_ID_POSTFIX)) {
       done(`Client ${targetClientId} is not connected to server`);
     } else {
       const publishMessage = [uuid, targetClientId, event, args];

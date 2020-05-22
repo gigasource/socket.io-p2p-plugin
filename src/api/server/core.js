@@ -185,7 +185,7 @@ class P2pServerCoreApi {
         if (this.io.kareem.hasHooks(POST_EMIT_TO)) {
           this.io.kareem.execPost(POST_EMIT_TO, null, [targetClientId, event, args], err => err & this.emitError(socket, err));
         } else {
-          if (targetClientId.endsWith(SERVER_SIDE_SOCKET_ID_POSTFIX)) return;
+          if (targetClientId && targetClientId.endsWith(SERVER_SIDE_SOCKET_ID_POSTFIX)) return;
 
           const error = new Error(`Client ${targetClientId} is not connected to server`);
           this.emitError(socket, error);
