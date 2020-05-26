@@ -1,6 +1,6 @@
 {
   "name": "@gigasource/socket.io-p2p-plugin",
-  "version": "1.8.3",
+  "version": "0.0.1-redis-adapter-experiment",
   "description": "",
   "main": "src/index.js",
   "scripts": {

@@ -9,6 +9,7 @@ const {
     EMIT_TO_CHANNEL,
     ACK_CHANNEL_PREFIX,
     EMIT_TO_PERSISTENT_ACK_CHANNEL,
+    VIRTUAL_CLIENT_SET_KEY,
   },
 } = require('../../../util/constants');
 
@@ -16,13 +17,19 @@ module.exports = function (io, serverPlugin) {
   const uuid = uuidv1();
   const redisPubClient = io._adapter.pubClient;
   const redisSubClient = io._adapter.subClient;
-  io.clusterClients = new Set();
   const acks = {};
   const reviverFn = (key, value) => {
     if (value && value.type === 'Buffer' && Array.isArray(value.data)) return Buffer.from(value.data);
 
     return value;
   }
+
+  io.clusterClients = new Set();
+
+  redisPubClient.smembers(VIRTUAL_CLIENT_SET_KEY, (err, clientIds) => {
+    if (err) console.error(err);
+    else clientIds.forEach(clientId => io.clusterClients.add(clientId));
+  });
 
   redisSubClient.subscribe(CLIENT_CONNECTION_CHANNEL);
   redisSubClient.subscribe(CLIENT_DISCONNECTION_CHANNEL);
@@ -87,9 +94,15 @@ module.exports = function (io, serverPlugin) {
     const {clientId} = socket.request._query;
     if (!clientId) return
 
+    io.clusterClients.add(clientId);
     redisPubClient.publish(CLIENT_CONNECTION_CHANNEL, JSON.stringify(clientId));
+    redisPubClient.sadd(VIRTUAL_CLIENT_SET_KEY, clientId);
 
-    socket.once('disconnect', () => redisPubClient.publish(CLIENT_DISCONNECTION_CHANNEL, JSON.stringify(clientId)));
+    socket.once('disconnect', () => {
+      io.clusterClients.delete(clientId);
+      redisPubClient.publish(CLIENT_DISCONNECTION_CHANNEL, JSON.stringify(clientId));
+      redisPubClient.srem(VIRTUAL_CLIENT_SET_KEY, clientId);
+    });
   });
 
   io.kareem.post(POST_EMIT_TO, function (targetClientId, event, args, done) {

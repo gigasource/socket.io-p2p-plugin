@@ -181,9 +181,12 @@ class ServerSideDuplex extends Duplex {
   };
 
   /*
-  This is to avoid write after destroyed error
+    This is to avoid write after destroyed error
+    Sometimes if p2p stream is destroyed immediately, other streams can still try to write to p2p stream,
+    causing ERR_STREAM_DESTROYED error
    */
   cleanup(timeout) {
+    // The timeout is to make sure if 'finish' event is not called (no data left to write), stream will still be destroyed
     let destroyTimeout;
 
     if (timeout) {
