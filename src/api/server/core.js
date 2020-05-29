@@ -35,15 +35,6 @@ class P2pServerCoreApi {
   addClient(clientId, clientSocketId) {
     if (!clientId) throw new Error('clientId can not be null');
 
-    // support client overwriting
-    if (this.clientMap[clientId]) {
-      const oldSocket = this.getSocketByClientId(clientId);
-      if (oldSocket) {
-        oldSocket.removeAllListeners();
-        oldSocket.disconnect(true);
-      }
-    }
-
     this.clientMap[clientId] = clientSocketId;
   }
 

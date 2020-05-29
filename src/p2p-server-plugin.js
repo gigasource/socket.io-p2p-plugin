@@ -18,12 +18,14 @@ module.exports = function p2pServerPlugin(io, options = {}) {
 
     if (!clientId) return;
 
-    if (!clientOverwrite && p2pServerCoreApi.getSocketIdByClientId(clientId)) {
-      const errorMessage = `Duplicated clientId: ${clientId}, sockets with duplicated clientId will be forcibly disconnected`;
+    if (p2pServerCoreApi.getSocketIdByClientId(clientId)) {
+      const errorMessage = `Duplicated clientId ${clientId} on connect`;
+      console.error(errorMessage);
 
-      console.error(errorMessage)
-      socket.emit(SERVER_ERROR, errorMessage);
-      return socket.disconnect(true);
+      if (!clientOverwrite) {
+        socket.emit(SERVER_ERROR, errorMessage + ', new socket with duplicated clientId will be disconnected');
+        return socket.disconnect();
+      }
     }
 
     socket.clientId = clientId;
