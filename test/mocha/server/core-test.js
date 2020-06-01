@@ -390,7 +390,7 @@ describe('Server Core API', function () {
             });
           }
         });
-        it('should disconnect old client and add new client with duplicated clientId if clientOverwrite === true', function (done) {
+        it('should replace old client with new client with duplicated clientId if clientOverwrite === true', function (done) {
           const testServer = startServer({saveMessage, loadMessages, deleteMessage, updateMessage, clientOverwrite: true});
           const clientId = uuidv1();
           const testEvent = 'createNews';
@@ -426,7 +426,14 @@ describe('Server Core API', function () {
             if (connectedClients < 2) return;
 
             testServer.emitTo(clientId, testEvent, () => {
-              expect(testClient1.connected).to.equal(false);
+              // expect(testClient1.connected).to.equal(false);
+
+              /*
+                updated logic: let client disconnects instead of forcing socket to disconnect on server side
+                we suspect closing socket connection of old client affects connection of new client, making new client
+                unable to connect
+               */
+              expect(testClient1.connected).to.equal(true);
               expect(testClient2.connected).to.equal(true);
               // cleanup
               testClient1.disconnect();

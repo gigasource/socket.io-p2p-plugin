@@ -80,7 +80,7 @@ class P2pServerCoreApi {
     }
   }
 
-  emitToPersistent(targetClientId, event, args = [], ackFnName, ackFnArgs = []) {
+  async emitToPersistent(targetClientId, event, args = [], ackFnName, ackFnArgs = []) {
     const missingFunctionError = this.checkRequiredFunctions();
     if (missingFunctionError) throw missingFunctionError;
 
@@ -90,20 +90,19 @@ class P2pServerCoreApi {
     if (!Array.isArray(args)) args = [args];
     if (!Array.isArray(ackFnArgs)) ackFnArgs = [ackFnArgs];
 
-    (async () => {
-      const messageId = await this.saveMessage(targetClientId, {usageCount: 1, event, args, ackFnName, ackFnArgs});
+    const messageId = await this.saveMessage(targetClientId, {usageCount: 1, event, args, ackFnName, ackFnArgs});
+    if (!messageId) throw new Error('saveMessage function must return a message ID');
 
-      if (!messageId) throw new Error('saveMessage function must return a message ID');
+    args.push((...targetClientCallbackArgs) => {
+      this.deleteMessage(targetClientId, messageId);
 
-      args.push((...targetClientCallbackArgs) => {
-        this.deleteMessage(targetClientId, messageId);
+      const ackFunctions = this.ackFunctions[ackFnName] || [];
+      ackFunctions.forEach(fn => fn(...(ackFnArgs.concat(targetClientCallbackArgs))));
+    });
+    this.emitTo(targetClientId, event, ...args);
 
-        const ackFunctions = this.ackFunctions[ackFnName] || [];
-        ackFunctions.forEach(fn => fn(...(ackFnArgs.concat(targetClientCallbackArgs))));
-      });
-
-      this.emitTo(targetClientId, event, ...args);
-    })()
+    // message won't be sent again if this function is called
+    return () => this.deleteMessage(targetClientId, messageId);
   }
 
   registerAckFunction(name, fn) {
