@@ -124,7 +124,7 @@ module.exports = function (io, serverPlugin) {
 
     redisPubClient.set(clientIdKey, thisUuid, err => {
       if (err) console.error(err);
-      redisPubClient.publish(UPDATE_CLIENT_LIST_CHANNEL);
+      redisPubClient.publish(UPDATE_CLIENT_LIST_CHANNEL, '');
     });
 
     socket.once('disconnect', () => {
@@ -140,7 +140,7 @@ module.exports = function (io, serverPlugin) {
             } else if (instanceUuid === thisUuid) {
               redisPubClient.multi().del(clientIdKey).exec((execError, replies) => {
                 if (execError) console.error(execError);
-                redisPubClient.publish(UPDATE_CLIENT_LIST_CHANNEL);
+                redisPubClient.publish(UPDATE_CLIENT_LIST_CHANNEL, '');
                 /*
                   NOTE: if execError === null && replies === null, it means that the key's value was modified in the middle
                         of the transaction
