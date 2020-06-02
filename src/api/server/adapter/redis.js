@@ -39,6 +39,11 @@ module.exports = function (io, serverPlugin) {
     }
   }
 
+  async function getClusterClientSet() {
+    const clusterClientIds = await getClusterClientIds();
+    return new Set(clusterClientIds);
+  }
+
   /*
     this is a local copy of cluster client list, it may not be accurate but it's needed for emitTo
     if getClusterClientIds function is used on every emitTo calls, performance will be affected
@@ -52,7 +57,7 @@ module.exports = function (io, serverPlugin) {
 
   getClusterClientIds((error, clusterClientIds) => {
     if (error) console.error(error);
-    clusterClientIds.forEach(clientId => io.clusterClients.add(clientId));
+    else io.clusterClients = new Set(clusterClientIds);
   });
 
   redisSubClient.subscribe(UPDATE_CLIENT_LIST_CHANNEL);
@@ -64,15 +69,7 @@ module.exports = function (io, serverPlugin) {
     switch (channel) {
         // Client connection/disconnection handlers
       case UPDATE_CLIENT_LIST_CHANNEL: {
-        try {
-          const clusterClientIds = await getClusterClientIds();
-          const newClusterClientSet = new Set();
-          clusterClientIds.forEach(clientId => newClusterClientSet.add(clientId));
-
-          io.clusterClients = newClusterClientSet;
-        } catch (e) {
-          console.error(e);
-        }
+        io.clusterClients = await getClusterClientSet();
         break;
       }
 
@@ -115,21 +112,19 @@ module.exports = function (io, serverPlugin) {
     }
   });
 
-  io.on('connect', socket => {
+  io.on('connect', async socket => {
     const {clientId} = socket.request._query;
     if (!clientId) return
 
     const clientIdKey = REDIS_CLIENT_ID_KEY_PREFIX + clientId;
-    io.clusterClients.add(clientId);
 
-    redisPubClient.set(clientIdKey, socket.id, err => {
+    redisPubClient.set(clientIdKey, socket.id, async err => {
       if (err) console.error(err);
       redisPubClient.publish(UPDATE_CLIENT_LIST_CHANNEL, '');
+      io.clusterClients = await getClusterClientSet();
     });
 
     socket.once('disconnect', () => {
-      io.clusterClients.delete(clientId);
-
       // Use watch to make sure the key's value is not modified in between the commands
       redisPubClient.watch(clientIdKey, watchError => {
         if (watchError) console.error(watchError);
@@ -138,9 +133,10 @@ module.exports = function (io, serverPlugin) {
             if (getError) {
               console.error(getError);
             } else if (socketId === socket.id) {
-              redisPubClient.multi().del(clientIdKey).exec((execError, replies) => {
+              redisPubClient.multi().del(clientIdKey).exec(async (execError, replies) => {
                 if (execError) console.error(execError);
                 redisPubClient.publish(UPDATE_CLIENT_LIST_CHANNEL, '');
+                io.clusterClients = await getClusterClientSet();
                 /*
                   NOTE: if execError === null && replies === null, it means that the key's value was modified in the middle
                         of the transaction
