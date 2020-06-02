@@ -37,7 +37,7 @@ class P2pServerCoreApi {
 
     // Remove all listeners from old socket to avoid side effects
     const oldSocket = this.getSocketByClientId(clientId);
-    oldSocket.removeAllListeners();
+    if (oldSocket) oldSocket.removeAllListeners();
 
     this.clientMap[clientId] = clientSocketId;
   }
