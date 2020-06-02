@@ -50,7 +50,8 @@ module.exports = function (io, serverPlugin) {
    */
   io.getClusterClientIds = getClusterClientIds;
 
-  getClusterClientIds(clusterClientIds => {
+  getClusterClientIds((error, clusterClientIds) => {
+    if (error) console.error(error);
     clusterClientIds.forEach(clientId => io.clusterClients.add(clientId));
   });
 
@@ -63,11 +64,15 @@ module.exports = function (io, serverPlugin) {
     switch (channel) {
         // Client connection/disconnection handlers
       case UPDATE_CLIENT_LIST_CHANNEL: {
-        const clusterClientIds = await getClusterClientIds();
-        const newClusterClientSet = new Set();
-        clusterClientIds.forEach(clientId => newClusterClientSet.add(clientId));
+        try {
+          const clusterClientIds = await getClusterClientIds();
+          const newClusterClientSet = new Set();
+          clusterClientIds.forEach(clientId => newClusterClientSet.add(clientId));
 
-        io.clusterClients = newClusterClientSet;
+          io.clusterClients = newClusterClientSet;
+        } catch (e) {
+          console.error(e);
+        }
         break;
       }
 
