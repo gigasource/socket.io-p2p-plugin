@@ -33,7 +33,7 @@ module.exports = function (io, serverPlugin) {
       return new Promise((resolve, reject) => {
         redisPubClient.keys(REDIS_CLIENT_ID_KEY_PREFIX + '*', (err, keys) => {
           if (err) reject(err);
-          else keys.map(key => key.slice(REDIS_CLIENT_ID_KEY_PREFIX.length));
+          else resolve(keys.map(key => key.slice(REDIS_CLIENT_ID_KEY_PREFIX.length)));
         });
       });
     }

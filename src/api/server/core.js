@@ -35,6 +35,10 @@ class P2pServerCoreApi {
   addClient(clientId, clientSocketId) {
     if (!clientId) throw new Error('clientId can not be null');
 
+    // Remove all listeners from old socket to avoid side effects
+    const oldSocket = this.getSocketByClientId(clientId);
+    oldSocket.removeAllListeners();
+
     this.clientMap[clientId] = clientSocketId;
   }
 
