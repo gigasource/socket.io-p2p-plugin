@@ -9,12 +9,12 @@ const {
     EMIT_TO_CHANNEL,
     ACK_CHANNEL_PREFIX,
     EMIT_TO_PERSISTENT_ACK_CHANNEL,
-    VIRTUAL_CLIENT_SET_KEY,
+    REDIS_CLIENT_ID_KEY_PREFIX,
   },
 } = require('../../../util/constants');
 
 module.exports = function (io, serverPlugin) {
-  const uuid = uuidv1();
+  const thisUuid = uuidv1();
   const redisPubClient = io._adapter.pubClient;
   const redisSubClient = io._adapter.subClient;
   const acks = {};
@@ -26,15 +26,15 @@ module.exports = function (io, serverPlugin) {
 
   io.clusterClients = new Set();
 
-  redisPubClient.smembers(VIRTUAL_CLIENT_SET_KEY, (err, clientIds) => {
+  redisPubClient.keys(REDIS_CLIENT_ID_KEY_PREFIX + '*', (err, keys) => {
     if (err) console.error(err);
-    else clientIds.forEach(clientId => io.clusterClients.add(clientId));
+    else keys.forEach(key => io.clusterClients.add(key.slice(REDIS_CLIENT_ID_KEY_PREFIX.length)));
   });
 
   redisSubClient.subscribe(CLIENT_CONNECTION_CHANNEL);
   redisSubClient.subscribe(CLIENT_DISCONNECTION_CHANNEL);
   redisSubClient.subscribe(EMIT_TO_CHANNEL);
-  redisSubClient.subscribe(ACK_CHANNEL_PREFIX + uuid);
+  redisSubClient.subscribe(ACK_CHANNEL_PREFIX + thisUuid);
   redisSubClient.subscribe(EMIT_TO_PERSISTENT_ACK_CHANNEL);
 
   redisSubClient.on('message', function (channel, message) {
@@ -55,7 +55,7 @@ module.exports = function (io, serverPlugin) {
       case EMIT_TO_CHANNEL: {
         const [originId, targetClientId, event, args, ackId] = JSON.parse(message, reviverFn);
 
-        if (uuid === originId) return; //ignore message sent from self
+        if (thisUuid === originId) return; //ignore message sent from self
 
         const emitArgs = [targetClientId, event, ...args];
         if (ackId) emitArgs.push((...ackArgs) => {
@@ -71,14 +71,14 @@ module.exports = function (io, serverPlugin) {
       }
       case EMIT_TO_PERSISTENT_ACK_CHANNEL: {
         const [originId, ackFnName, argArray] = JSON.parse(message, reviverFn);
-        if (uuid === originId) return; //ignore message sent from self
+        if (thisUuid === originId) return; //ignore message sent from self
 
         const ackFunctions = serverPlugin.ackFunctions[ackFnName] || [];
         if (ackFunctions.length > 0) ackFunctions.forEach(fn => fn(...argArray));
         break;
       }
         // support for ack functions between nodes
-      case ACK_CHANNEL_PREFIX + uuid: {
+      case ACK_CHANNEL_PREFIX + thisUuid: {
         const [ackId, ackArgs] = JSON.parse(message, reviverFn);
 
         const ack = acks[ackId];
@@ -94,14 +94,35 @@ module.exports = function (io, serverPlugin) {
     const {clientId} = socket.request._query;
     if (!clientId) return
 
+    const clientIdKey = REDIS_CLIENT_ID_KEY_PREFIX + clientId;
     io.clusterClients.add(clientId);
     redisPubClient.publish(CLIENT_CONNECTION_CHANNEL, JSON.stringify(clientId));
-    redisPubClient.sadd(VIRTUAL_CLIENT_SET_KEY, clientId);
+    redisPubClient.set(clientIdKey, thisUuid);
 
     socket.once('disconnect', () => {
       io.clusterClients.delete(clientId);
       redisPubClient.publish(CLIENT_DISCONNECTION_CHANNEL, JSON.stringify(clientId));
-      redisPubClient.srem(VIRTUAL_CLIENT_SET_KEY, clientId);
+
+      // Use watch to make sure the key's value is not modified in between the commands
+      redisPubClient.watch(clientIdKey, watchError => {
+        if (watchError) console.error(watchError);
+        else {
+          redisPubClient.get(clientIdKey, (getError, instanceUuid) => {
+            if (getError) console.error(getError);
+            else if (instanceUuid === thisUuid) {
+              redisPubClient.multi().del(clientIdKey).exec((execError, replies) => {
+                if (execError) console.error(execError);
+                /*
+                  NOTE: if execError === null && replies === null, it means that the key's value was modified in the middle
+                        of the transaction
+
+                        if execError === null && replies !== null, it means that the transaction was successful
+                 */
+              });
+            }
+          });
+        }
+      });
     });
   });
 
@@ -109,7 +130,7 @@ module.exports = function (io, serverPlugin) {
     if (!io.clusterClients.has(targetClientId) && !targetClientId.endsWith(SERVER_SIDE_SOCKET_ID_POSTFIX)) {
       done(`Client ${targetClientId} is not connected to server`);
     } else {
-      const publishMessage = [uuid, targetClientId, event, args];
+      const publishMessage = [thisUuid, targetClientId, event, args];
 
       if (typeof args[args.length - 1] === "function") {
         const callback = args.pop();
@@ -124,7 +145,7 @@ module.exports = function (io, serverPlugin) {
   });
 
   io.kareem.post(POST_EMIT_TO_PERSISTENT_ACK, function (ackFnName, argArray) {
-    const publishMessage = [uuid, ackFnName, argArray];
+    const publishMessage = [thisUuid, ackFnName, argArray];
 
     redisPubClient.publish(EMIT_TO_PERSISTENT_ACK_CHANNEL, JSON.stringify(publishMessage));
   });
