@@ -122,7 +122,7 @@ module.exports = function (io, serverPlugin) {
     const clientIdKey = REDIS_CLIENT_ID_KEY_PREFIX + clientId;
     io.clusterClients.add(clientId);
 
-    redisPubClient.set(clientIdKey, thisUuid, err => {
+    redisPubClient.set(clientIdKey, socket.id, err => {
       if (err) console.error(err);
       redisPubClient.publish(UPDATE_CLIENT_LIST_CHANNEL, '');
     });
@@ -134,10 +134,10 @@ module.exports = function (io, serverPlugin) {
       redisPubClient.watch(clientIdKey, watchError => {
         if (watchError) console.error(watchError);
         else {
-          redisPubClient.get(clientIdKey, (getError, instanceUuid) => {
+          redisPubClient.get(clientIdKey, (getError, socketId) => {
             if (getError) {
               console.error(getError);
-            } else if (instanceUuid === thisUuid) {
+            } else if (socketId === socket.id) {
               redisPubClient.multi().del(clientIdKey).exec((execError, replies) => {
                 if (execError) console.error(execError);
                 redisPubClient.publish(UPDATE_CLIENT_LIST_CHANNEL, '');
