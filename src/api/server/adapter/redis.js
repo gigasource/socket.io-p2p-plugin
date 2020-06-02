@@ -4,8 +4,7 @@ const {
   HOOK_NAME: {POST_EMIT_TO, POST_EMIT_TO_PERSISTENT_ACK},
   INTERNAL_EMITTER_EVENT: {DATA_FROM_ANOTHER_SERVER},
   REDIS_KEYS: {
-    CLIENT_CONNECTION_CHANNEL,
-    CLIENT_DISCONNECTION_CHANNEL,
+    UPDATE_CLIENT_LIST_CHANNEL,
     EMIT_TO_CHANNEL,
     ACK_CHANNEL_PREFIX,
     EMIT_TO_PERSISTENT_ACK_CHANNEL,
@@ -24,30 +23,51 @@ module.exports = function (io, serverPlugin) {
     return value;
   }
 
+  function getClusterClientIds(callback) {
+    if (callback) {
+      redisPubClient.keys(REDIS_CLIENT_ID_KEY_PREFIX + '*', (err, keys) => {
+        if (err) callback(err);
+        else callback(null, keys.map(key => key.slice(REDIS_CLIENT_ID_KEY_PREFIX.length)));
+      });
+    } else {
+      return new Promise((resolve, reject) => {
+        redisPubClient.keys(REDIS_CLIENT_ID_KEY_PREFIX + '*', (err, keys) => {
+          if (err) reject(err);
+          else keys.map(key => key.slice(REDIS_CLIENT_ID_KEY_PREFIX.length));
+        });
+      });
+    }
+  }
+
+  /*
+    this is a local copy of cluster client list, it may not be accurate but it's needed for emitTo
+    if getClusterClientIds function is used on every emitTo calls, performance will be affected
+   */
   io.clusterClients = new Set();
 
-  redisPubClient.keys(REDIS_CLIENT_ID_KEY_PREFIX + '*', (err, keys) => {
-    if (err) console.error(err);
-    else keys.forEach(key => io.clusterClients.add(key.slice(REDIS_CLIENT_ID_KEY_PREFIX.length)));
+  /*
+    use this function to get an accurate list of clients connected to cluster
+   */
+  io.getClusterClientIds = getClusterClientIds;
+
+  getClusterClientIds(clusterClientIds => {
+    clusterClientIds.forEach(clientId => io.clusterClients.add(clientId));
   });
 
-  redisSubClient.subscribe(CLIENT_CONNECTION_CHANNEL);
-  redisSubClient.subscribe(CLIENT_DISCONNECTION_CHANNEL);
+  redisSubClient.subscribe(UPDATE_CLIENT_LIST_CHANNEL);
   redisSubClient.subscribe(EMIT_TO_CHANNEL);
   redisSubClient.subscribe(ACK_CHANNEL_PREFIX + thisUuid);
   redisSubClient.subscribe(EMIT_TO_PERSISTENT_ACK_CHANNEL);
 
-  redisSubClient.on('message', function (channel, message) {
+  redisSubClient.on('message', async function (channel, message) {
     switch (channel) {
         // Client connection/disconnection handlers
-      case CLIENT_CONNECTION_CHANNEL: {
-        const clientId = JSON.parse(message);
-        io.clusterClients.add(clientId);
-        break;
-      }
-      case CLIENT_DISCONNECTION_CHANNEL: {
-        const clientId = JSON.parse(message);
-        io.clusterClients.delete(clientId);
+      case UPDATE_CLIENT_LIST_CHANNEL: {
+        const clusterClientIds = await getClusterClientIds();
+        const newClusterClientSet = new Set();
+        clusterClientIds.forEach(clientId => newClusterClientSet.add(clientId));
+
+        io.clusterClients = newClusterClientSet;
         break;
       }
 
@@ -96,22 +116,26 @@ module.exports = function (io, serverPlugin) {
 
     const clientIdKey = REDIS_CLIENT_ID_KEY_PREFIX + clientId;
     io.clusterClients.add(clientId);
-    redisPubClient.publish(CLIENT_CONNECTION_CHANNEL, JSON.stringify(clientId));
-    redisPubClient.set(clientIdKey, thisUuid);
+
+    redisPubClient.set(clientIdKey, thisUuid, err => {
+      if (err) console.error(err);
+      redisPubClient.publish(UPDATE_CLIENT_LIST_CHANNEL);
+    });
 
     socket.once('disconnect', () => {
       io.clusterClients.delete(clientId);
-      redisPubClient.publish(CLIENT_DISCONNECTION_CHANNEL, JSON.stringify(clientId));
 
       // Use watch to make sure the key's value is not modified in between the commands
       redisPubClient.watch(clientIdKey, watchError => {
         if (watchError) console.error(watchError);
         else {
           redisPubClient.get(clientIdKey, (getError, instanceUuid) => {
-            if (getError) console.error(getError);
-            else if (instanceUuid === thisUuid) {
+            if (getError) {
+              console.error(getError);
+            } else if (instanceUuid === thisUuid) {
               redisPubClient.multi().del(clientIdKey).exec((execError, replies) => {
                 if (execError) console.error(execError);
+                redisPubClient.publish(UPDATE_CLIENT_LIST_CHANNEL);
                 /*
                   NOTE: if execError === null && replies === null, it means that the key's value was modified in the middle
                         of the transaction
