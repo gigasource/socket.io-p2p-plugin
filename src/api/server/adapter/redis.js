@@ -125,29 +125,32 @@ module.exports = function (io, serverPlugin) {
     });
 
     socket.once('disconnect', () => {
-      // Use watch to make sure the key's value is not modified in between the commands
-      redisPubClient.watch(clientIdKey, watchError => {
-        if (watchError) console.error(watchError);
-        else {
-          redisPubClient.get(clientIdKey, (getError, socketId) => {
-            if (getError) {
-              console.error(getError);
-            } else if (socketId === socket.id) {
-              redisPubClient.multi().del(clientIdKey).exec(async (execError, replies) => {
-                if (execError) console.error(execError);
-                redisPubClient.publish(UPDATE_CLIENT_LIST_CHANNEL, '');
-                io.clusterClients = await getClusterClientSet();
-                /*
-                  NOTE: if execError === null && replies === null, it means that the key's value was modified in the middle
-                        of the transaction
+      // setTimeout is used to delay clientId removal, sometimes we've observed buggy behaviors if clientId is removed immediately
+      setTimeout(() => {
+        // Use watch to make sure the key's value is not modified in between the commands
+        redisPubClient.watch(clientIdKey, watchError => {
+          if (watchError) console.error(watchError);
+          else {
+            redisPubClient.get(clientIdKey, (getError, socketId) => {
+              if (getError) {
+                console.error(getError);
+              } else if (socketId === socket.id) {
+                redisPubClient.multi().del(clientIdKey).exec(async (execError, replies) => {
+                  if (execError) console.error(execError);
+                  redisPubClient.publish(UPDATE_CLIENT_LIST_CHANNEL, '');
+                  io.clusterClients = await getClusterClientSet();
+                  /*
+                    NOTE: if execError === null && replies === null, it means that the key's value was modified in the middle
+                          of the transaction
 
-                        if execError === null && replies !== null, it means that the transaction was successful
-                 */
-              });
-            }
-          });
-        }
-      });
+                          if execError === null && replies !== null, it means that the transaction was successful
+                   */
+                });
+              }
+            });
+          }
+        });
+      }, 3000);
     });
   });
 
