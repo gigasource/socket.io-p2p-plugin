@@ -45,6 +45,8 @@ module.exports = function (io, serverPlugin) {
   }
 
   function removeClusterClient(clientIdKey, socket) {
+    const clientId = clientIdKey.slice(REDIS_CLIENT_ID_KEY_PREFIX.length);
+
     return new Promise((resolve, reject) => {
       // Use watch to make sure the key's value is not modified in between the commands
       redisPubClient.watch(clientIdKey, watchError => {
@@ -64,18 +66,12 @@ module.exports = function (io, serverPlugin) {
                  */
                 if (!execError && !replies) {
                   const msg = `p2p Socket.io lib: key changed while redis client was trying to del key ${clientIdKey}, socketId = ${socket.id}`;
-                  serverPlugin.emitLibLog(msg, {
-                    clientId: clientIdKey.slice(REDIS_CLIENT_ID_KEY_PREFIX.length),
-                    socketId: socket.id
-                  });
+                  serverPlugin.emitLibLog(msg, {clientId, socketId: socket.id});
                 }
 
                 if (!execError && replies) {
                   const msg = `p2p Socket.io lib: successfully deleted key ${clientIdKey}, socketId = ${socket.id}`;
-                  serverPlugin.emitLibLog(msg, {
-                    clientId: clientIdKey.slice(REDIS_CLIENT_ID_KEY_PREFIX.length),
-                    socketId: socket.id
-                  });
+                  serverPlugin.emitLibLog(msg, {clientId, socketId: socket.id});
                 }
 
                 redisPubClient.publish(UPDATE_CLIENT_LIST_CHANNEL, '');
@@ -84,6 +80,11 @@ module.exports = function (io, serverPlugin) {
                 if (execError) reject(execError);
                 else resolve();
               });
+            } else {
+              const msg = `p2p Socket.io lib: key removal failed, key = ${clientIdKey}, socketId = ${socket.id} but socketId on Redis is ${socketId}`;
+              serverPlugin.emitLibLog(msg, {clientId, socketId: socket.id});
+
+              reject(new Error(msg));
             }
           });
         }
@@ -111,11 +112,16 @@ module.exports = function (io, serverPlugin) {
     return Promise.all(instanceClients.map(clientId => new Promise(resolve => {
       const clientIdKey = REDIS_CLIENT_ID_KEY_PREFIX + clientId;
       const socket = serverPlugin.getSocketByClientId(clientId);
+      let msg;
 
       removeClusterClient(clientIdKey, socket)
-          .then(resolve)
+          .then(() => {
+            msg = `p2p Socket.io lib: removeInstanceClients success, key = ${clientIdKey}, socketId = ${socket.id}`;
+          })
           .catch(error => {
-            const msg = `p2p Socket.io lib: Redis error: ${error.stack}`;
+            msg = `p2p Socket.io lib: removeInstanceClients error: ${error.stack}`;
+          })
+          .finally(() => {
             serverPlugin.emitLibLog(msg, {clientId, socketId: socket.id});
             resolve();
           });
@@ -227,7 +233,7 @@ module.exports = function (io, serverPlugin) {
     socket.once('disconnect', () => {
       removeClusterClient(clientIdKey, socket)
           .catch(error => {
-            const msg = `p2p Socket.io lib: Redis error: ${error.stack}`;
+            const msg = `p2p Socket.io lib: removeClusterClient error: ${error.stack}`;
             serverPlugin.emitLibLog(msg, {clientId, socketId: socket.id});
           });
     });
