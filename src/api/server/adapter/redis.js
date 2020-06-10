@@ -64,22 +64,18 @@ module.exports = function (io, serverPlugin) {
                  */
                 if (!execError && !replies) {
                   const msg = `p2p Socket.io lib: key changed while redis client was trying to del key ${clientIdKey}, socketId = ${socket.id}`;
-                  serverPlugin.logListenerCreated
-                      ? serverPlugin.emitLibLog(msg, {
-                        clientId: clientIdKey.slice(REDIS_CLIENT_ID_KEY_PREFIX.length),
-                        socketId: socket.id
-                      })
-                      : console.debug(msg)
+                  serverPlugin.emitLibLog(msg, {
+                    clientId: clientIdKey.slice(REDIS_CLIENT_ID_KEY_PREFIX.length),
+                    socketId: socket.id
+                  });
                 }
 
                 if (!execError && replies) {
                   const msg = `p2p Socket.io lib: successfully deleted key ${clientIdKey}, socketId = ${socket.id}`;
-                  serverPlugin.logListenerCreated
-                      ? serverPlugin.emitLibLog(msg, {
-                        clientId: clientIdKey.slice(REDIS_CLIENT_ID_KEY_PREFIX.length),
-                        socketId: socket.id
-                      })
-                      : console.debug(msg)
+                  serverPlugin.emitLibLog(msg, {
+                    clientId: clientIdKey.slice(REDIS_CLIENT_ID_KEY_PREFIX.length),
+                    socketId: socket.id
+                  });
                 }
 
                 redisPubClient.publish(UPDATE_CLIENT_LIST_CHANNEL, '');
@@ -120,9 +116,7 @@ module.exports = function (io, serverPlugin) {
           .then(resolve)
           .catch(error => {
             const msg = `p2p Socket.io lib: Redis error: ${error.stack}`;
-            serverPlugin.logListenerCreated
-                ? serverPlugin.emitLibLog(msg, {clientId, socketId: socket.id})
-                : console.debug(msg)
+            serverPlugin.emitLibLog(msg, {clientId, socketId: socket.id});
             resolve();
           });
     })));
@@ -139,9 +133,7 @@ module.exports = function (io, serverPlugin) {
         if (!err && !replies) {
           let msg = `p2p Socket.io lib: client ${clientId} missing from Redis list, set new value = ${socket.id}`;
 
-          serverPlugin.logListenerCreated
-              ? serverPlugin.emitLibLog(msg, {clientId, socketId: socket.id})
-              : console.debug(msg)
+          serverPlugin.emitLibLog(msg, {clientId, socketId: socket.id});
 
           redisPubClient.set(clientIdKey, socket.id);
         }
@@ -216,9 +208,7 @@ module.exports = function (io, serverPlugin) {
       let msg = `p2p Socket.io lib: successfully set key ${clientIdKey}, socketId = ${socket.id}`;
       if (err) msg = `p2p Socket.io lib: Redis error: ${err.stack}`;
 
-      serverPlugin.logListenerCreated
-          ? serverPlugin.emitLibLog(msg, {clientId, socketId: socket.id})
-          : console.debug(msg)
+      serverPlugin.emitLibLog(msg, {clientId, socketId: socket.id});
 
       redisPubClient.publish(UPDATE_CLIENT_LIST_CHANNEL, '');
       io.clusterClients = await getClusterClientSet();
@@ -228,9 +218,7 @@ module.exports = function (io, serverPlugin) {
       removeClusterClient(clientIdKey, socket)
           .catch(error => {
             const msg = `p2p Socket.io lib: Redis error: ${error.stack}`;
-            serverPlugin.logListenerCreated
-                ? serverPlugin.emitLibLog(msg, {clientId, socketId: socket.id})
-                : console.debug(msg)
+            serverPlugin.emitLibLog(msg, {clientId, socketId: socket.id});
           });
     });
   });
