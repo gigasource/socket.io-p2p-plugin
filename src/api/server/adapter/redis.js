@@ -129,13 +129,23 @@ module.exports = function (io, serverPlugin) {
       const clientIdKey = REDIS_CLIENT_ID_KEY_PREFIX + clientId;
       const socket = serverPlugin.getSocketByClientId(clientId);
 
-      redisPubClient.get(clientIdKey, (err, replies) => {
-        if (!err && !replies) {
+      redisPubClient.get(clientIdKey, (getErr, replies) => {
+        if (getErr) {
+          const msg = `p2p Socket.io lib: Redis get error in syncClientList: ${getErr.stack}`;
+          serverPlugin.emitLibLog(msg, {clientId, socketId: socket.id});
+        } else if (!getErr && !replies) {
           let msg = `p2p Socket.io lib: client ${clientId} missing from Redis list, set new value = ${socket.id}`;
 
           serverPlugin.emitLibLog(msg, {clientId, socketId: socket.id});
 
-          redisPubClient.set(clientIdKey, socket.id);
+          redisPubClient.set(clientIdKey, socket.id, setErr => {
+            let msg;
+
+            if (setErr) msg = `p2p Socket.io lib: Redis set error in syncClientList: ${setErr.stack}`;
+            else msg = `p2p Socket.io lib: successfully set key ${clientIdKey}, socketId = ${socket.id} in syncClientList`;
+
+            serverPlugin.emitLibLog(msg, {clientId, socketId: socket.id});
+          });
         }
       });
     });
