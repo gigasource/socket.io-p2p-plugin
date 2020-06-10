@@ -24,6 +24,7 @@ class P2pServerCoreApi {
     this.virtualClients = new Set();
     this.io = io;
     this.ee = new EventEmitter();
+    this.logListenerCreated = false;
 
     this.ackFunctions = {};
     this.saveMessage = options.saveMessage;
@@ -221,6 +222,15 @@ class P2pServerCoreApi {
 
     socket.once('disconnect', sourceDisconnectListener);
     targetClientSocket.once('disconnect', targetDisconnectListener);
+  }
+
+  onLibLog(callback) {
+    this.logListenerCreated = true;
+    this.ee.on('libLog', callback);
+  }
+
+  emitLibLog(...args) {
+    this.ee.emit('libLog', ...args);
   }
 
   initSocketBasedApis(socket) {

@@ -18,9 +18,21 @@ module.exports = function p2pServerPlugin(io, options = {}) {
 
     if (!clientId) return;
 
-    if (p2pServerCoreApi.getSocketIdByClientId(clientId)) {
-      const errorMessage = `Duplicated clientId ${clientId} on connect`;
-      console.error(errorMessage);
+    const existingSocket = p2pServerCoreApi.getSocketByClientId(clientId);
+
+    if (existingSocket) {
+      const errorMessage = `p2p Socket.io lib: Duplicated clientId ${clientId} on connect, new socket id = ${socket.id}`;
+
+      p2pServerCoreApi.logListenerCreated
+          ? p2pServerCoreApi.emitLibLog(errorMessage, {clientId, socketId: socket.id})
+          : console.error(errorMessage);
+
+      existingSocket.once('disconnect', () => {
+        const msg = `p2p Socket.io lib: Duplicated clientId ${clientId} on connect, old socket disconnected, id = ${existingSocket.id}`;
+        p2pServerCoreApi.logListenerCreated
+            ? p2pServerCoreApi.emitLibLog(msg, {clientId, socketId: socket.id})
+            : console.error(msg);
+      });
 
       if (!clientOverwrite) {
         socket.emit(SERVER_ERROR, errorMessage + ', new socket with duplicated clientId will be disconnected');
@@ -58,6 +70,10 @@ module.exports = function p2pServerPlugin(io, options = {}) {
     $on: p2pServerCoreApi.ee.on.bind(p2pServerCoreApi.ee),
     $off: p2pServerCoreApi.ee.off.bind(p2pServerCoreApi.ee),
     $once: p2pServerCoreApi.ee.once.bind(p2pServerCoreApi.ee),
+    // used for extending library logs
+    logListenerCreated: p2pServerCoreApi.logListenerCreated,
+    onLibLog: p2pServerCoreApi.onLibLog.bind(p2pServerCoreApi),
+    emitLibLog: p2pServerCoreApi.emitLibLog.bind(p2pServerCoreApi),
 
     provideService: p2pServerServiceApi.provideService.bind(p2pServerServiceApi),
     destroyService: p2pServerServiceApi.destroyService.bind(p2pServerServiceApi),

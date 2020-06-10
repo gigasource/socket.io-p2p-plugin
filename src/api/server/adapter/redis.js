@@ -44,6 +44,57 @@ module.exports = function (io, serverPlugin) {
     return new Set(clusterClientIds);
   }
 
+  function removeClusterClient(clientIdKey, socket) {
+    return new Promise((resolve, reject) => {
+      // Use watch to make sure the key's value is not modified in between the commands
+      redisPubClient.watch(clientIdKey, watchError => {
+        if (watchError) {
+          reject(watchError);
+        } else {
+          redisPubClient.get(clientIdKey, (getError, socketId) => {
+            if (getError) {
+              reject(getError);
+            } else if (socketId === socket.id) {
+              redisPubClient.multi().del(clientIdKey).exec(async (execError, replies) => {
+                /*
+                  NOTE: if execError === null && replies === null, it means that the key's value was modified in the middle
+                        of the transaction, no further action is needed since the transaction will have no effects
+
+                        if execError === null && replies !== null, it means that the transaction was successful
+                 */
+                if (!execError && !replies) {
+                  const msg = `p2p Socket.io lib: key changed while redis client was trying to del key ${clientIdKey}, socketId = ${socket.id}`;
+                  serverPlugin.logListenerCreated
+                      ? serverPlugin.emitLibLog(msg, {
+                        clientId: clientIdKey.slice(REDIS_CLIENT_ID_KEY_PREFIX.length),
+                        socketId: socket.id
+                      })
+                      : console.debug(msg)
+                }
+
+                if (!execError && replies) {
+                  const msg = `p2p Socket.io lib: successfully deleted key ${clientIdKey}, socketId = ${socket.id}`;
+                  serverPlugin.logListenerCreated
+                      ? serverPlugin.emitLibLog(msg, {
+                        clientId: clientIdKey.slice(REDIS_CLIENT_ID_KEY_PREFIX.length),
+                        socketId: socket.id
+                      })
+                      : console.debug(msg)
+                }
+
+                redisPubClient.publish(UPDATE_CLIENT_LIST_CHANNEL, '');
+                io.clusterClients = await getClusterClientSet();
+
+                if (execError) reject(execError);
+                else resolve();
+              });
+            }
+          });
+        }
+      });
+    });
+  }
+
   /*
     this is a local copy of cluster client list, it may not be accurate but it's needed for emitTo
     if getClusterClientIds function is used on every emitTo calls, performance will be affected
@@ -54,6 +105,49 @@ module.exports = function (io, serverPlugin) {
     use this function to get an accurate list of clients connected to cluster
    */
   io.getClusterClientIds = getClusterClientIds;
+
+  /*
+    use this function to remove all clients belonging to an server instance when that instance exits/be killed
+   */
+  io.removeInstanceClients = function () {
+    const instanceClients = serverPlugin.getAllClientId();
+
+    return Promise.all(instanceClients.map(clientId => new Promise(resolve => {
+      const clientIdKey = REDIS_CLIENT_ID_KEY_PREFIX + clientId;
+      const socket = serverPlugin.getSocketByClientId(clientId);
+
+      removeClusterClient(clientIdKey, socket)
+          .then(resolve)
+          .catch(error => {
+            const msg = `p2p Socket.io lib: Redis error: ${error.stack}`;
+            serverPlugin.logListenerCreated
+                ? serverPlugin.emitLibLog(msg, {clientId, socketId: socket.id})
+                : console.debug(msg)
+            resolve();
+          });
+    })));
+  }
+
+  io.syncClientList = function () {
+    const instanceClients = serverPlugin.getAllClientId();
+
+    instanceClients.forEach(clientId => {
+      const clientIdKey = REDIS_CLIENT_ID_KEY_PREFIX + clientId;
+      const socket = serverPlugin.getSocketByClientId(clientId);
+
+      redisPubClient.get(clientIdKey, (err, replies) => {
+        if (!err && !replies) {
+          let msg = `p2p Socket.io lib: client ${clientId} missing from Redis list, set new value = ${socket.id}`;
+
+          serverPlugin.logListenerCreated
+              ? serverPlugin.emitLibLog(msg, {clientId, socketId: socket.id})
+              : console.debug(msg)
+
+          redisPubClient.set(clientIdKey, socket.id);
+        }
+      });
+    });
+  }
 
   getClusterClientIds((error, clusterClientIds) => {
     if (error) console.error(error);
@@ -119,38 +213,25 @@ module.exports = function (io, serverPlugin) {
     const clientIdKey = REDIS_CLIENT_ID_KEY_PREFIX + clientId;
 
     redisPubClient.set(clientIdKey, socket.id, async err => {
-      if (err) console.error(err);
+      let msg = `p2p Socket.io lib: successfully set key ${clientIdKey}, socketId = ${socket.id}`;
+      if (err) msg = `p2p Socket.io lib: Redis error: ${err.stack}`;
+
+      serverPlugin.logListenerCreated
+          ? serverPlugin.emitLibLog(msg, {clientId, socketId: socket.id})
+          : console.debug(msg)
+
       redisPubClient.publish(UPDATE_CLIENT_LIST_CHANNEL, '');
       io.clusterClients = await getClusterClientSet();
     });
 
     socket.once('disconnect', () => {
-      // setTimeout is used to delay clientId removal, sometimes we've observed buggy behaviors if clientId is removed immediately
-      setTimeout(() => {
-        // Use watch to make sure the key's value is not modified in between the commands
-        redisPubClient.watch(clientIdKey, watchError => {
-          if (watchError) console.error(watchError);
-          else {
-            redisPubClient.get(clientIdKey, (getError, socketId) => {
-              if (getError) {
-                console.error(getError);
-              } else if (socketId === socket.id) {
-                redisPubClient.multi().del(clientIdKey).exec(async (execError, replies) => {
-                  if (execError) console.error(execError);
-                  redisPubClient.publish(UPDATE_CLIENT_LIST_CHANNEL, '');
-                  io.clusterClients = await getClusterClientSet();
-                  /*
-                    NOTE: if execError === null && replies === null, it means that the key's value was modified in the middle
-                          of the transaction
-
-                          if execError === null && replies !== null, it means that the transaction was successful
-                   */
-                });
-              }
-            });
-          }
-        });
-      }, 3000);
+      removeClusterClient(clientIdKey, socket)
+          .catch(error => {
+            const msg = `p2p Socket.io lib: Redis error: ${error.stack}`;
+            serverPlugin.logListenerCreated
+                ? serverPlugin.emitLibLog(msg, {clientId, socketId: socket.id})
+                : console.debug(msg)
+          });
     });
   });
 
