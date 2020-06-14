@@ -9,12 +9,6 @@ const EventEmitter = require('events');
 class P2pServerCoreApi {
   constructor(io, options) {
     /*
-      clientMap is an object of connected clients with key = clientId & value = socket.id
-      Example: { clientA: '<id of connected socket>' }
-     */
-    this.clientMap = {};
-
-    /*
       virtualClients is a Set of server-created clientIds without real socket
       Example: [ 'clientA--server-side', 'clientB--server-side' ]
       These are used for reusing p2p code of client-server-client scenario for client-server scenario
@@ -33,7 +27,7 @@ class P2pServerCoreApi {
     this.updateMessage = options.updateMessage;
   }
 
-  addClient(clientId, clientSocketId) {
+/*  addClient(clientId, clientSocketId) {
     if (!clientId) throw new Error('clientId can not be null');
 
     // Remove all listeners from old socket to avoid side effects
@@ -45,24 +39,44 @@ class P2pServerCoreApi {
 
   removeClient(clientId) {
     delete this.clientMap[clientId];
+  }*/
+
+  getClientMap() {
+    const clientMap = {};
+    const connectedSocketMap = this.io.sockets.connected;
+
+    Object.keys(connectedSocketMap).forEach(socketId => {
+      const socket = connectedSocketMap[socketId];
+      const {clientId, createdTime} = socket;
+
+      if (clientId) {
+        const sk = clientMap[clientId];
+        if (!sk || (sk.createdTime && sk.createdTime < createdTime)) {
+          clientMap[clientId] = socket;
+        }
+      }
+    });
+
+    return clientMap;
   }
 
+
   getAllClientId() {
-    return Object.keys(this.clientMap);
+    return Object.keys(this.getClientMap());
   }
 
   getClientIdBySocketId(socketId) {
-    return findKey(this.clientMap, (v) => v === socketId);
+    return findKey(this.getClientMap(), socket => socket.id === socketId);
   }
 
   getSocketIdByClientId(clientId) {
-    return this.clientMap[clientId];
+    const socket = this.getClientMap()[clientId];
+    return socket ? socket.id : undefined;
   }
 
   getSocketByClientId(clientId) {
-    if (!this.clientMap[clientId]) return null;
-
-    return this.io.sockets.connected[this.getSocketIdByClientId(clientId)];
+    const socket = this.getClientMap()[clientId];
+    return socket ? socket : null;
   }
 
   // Socket-related functions
@@ -168,9 +182,9 @@ class P2pServerCoreApi {
   }
 
   createListeners(io, socket, clientId) {
-    socket.once('disconnect', () => {
+/*    socket.once('disconnect', () => {
       this.removeClient(clientId);
-    });
+    });*/
 
     const p2pEmitListener = (targetClientId, event, args, acknowledgeFn) => {
       if (acknowledgeFn) args.push(acknowledgeFn);

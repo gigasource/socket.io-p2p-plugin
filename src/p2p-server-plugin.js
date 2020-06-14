@@ -25,6 +25,8 @@ module.exports = function p2pServerPlugin(io, options = {}) {
 
       p2pServerCoreApi.emitLibLog(errorMessage, {clientId, socketId: socket.id});
 
+      // Remove all listeners from old socket to avoid side effects
+      existingSocket.removeAllListeners();
       existingSocket.once('disconnect', () => {
         const msg = `p2p Socket.io lib: Duplicated clientId ${clientId} on connect, old socket disconnected, id = ${existingSocket.id}`;
         p2pServerCoreApi.emitLibLog(msg, {clientId, socketId: socket.id});
@@ -37,8 +39,8 @@ module.exports = function p2pServerPlugin(io, options = {}) {
     }
 
     socket.clientId = clientId;
+    socket.createdTime = new Date();
 
-    p2pServerCoreApi.addClient(clientId, socket.id);
     p2pServerCoreApi.sendSavedMessages(clientId);
 
     p2pServerCoreApi.createListeners(io, socket, clientId);
