@@ -1,6 +1,6 @@
 {
   "name": "@gigasource/socket.io-p2p-plugin",
-  "version": "1.8.19",
+  "version": "1.8.20",
   "description": "",
   "main": "src/index.js",
   "scripts": {

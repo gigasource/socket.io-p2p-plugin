@@ -29,7 +29,7 @@ module.exports = function p2pServerPlugin(io, options = {}) {
       existingSocket.removeAllListeners();
       existingSocket.once('disconnect', () => {
         const msg = `p2p Socket.io lib: Duplicated clientId ${clientId} on connect, old socket disconnected, id = ${existingSocket.id}`;
-        p2pServerCoreApi.emitLibLog(msg, {clientId, socketId: socket.id});
+        p2pServerCoreApi.emitLibLog(msg, {clientId, socketId: existingSocket.id});
       });
 
       if (!clientOverwrite) {
