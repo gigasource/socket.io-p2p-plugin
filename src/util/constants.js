@@ -6,6 +6,7 @@ module.exports.SOCKET_EVENT = Object.freeze({
   JOIN_ROOM: 'JOIN_ROOM',
   LEAVE_ROOM: 'LEAVE_ROOM',
   EMIT_ROOM: 'EMIT_ROOM',
+  SERVER_PING: 'SERVER_PING',
   // Message API events
   P2P_EMIT: 'P2P_EMIT',
   P2P_REGISTER: 'P2P_REGISTER',

@@ -7,6 +7,7 @@ class P2pClientCoreApi {
     this.clientId = clientId;
 
     this.socket.on(SOCKET_EVENT.SERVER_ERROR, (err) => console.error(`Error sent from server to client '${this.clientId}': ${err}`));
+    this.socket.on(SOCKET_EVENT.SERVER_PING, callback => callback(`pong from client ${clientId}`));
   }
 
   /* Note: currently room functions do not have any security feature,

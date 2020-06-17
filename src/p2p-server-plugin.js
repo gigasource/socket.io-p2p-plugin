@@ -2,7 +2,7 @@ const P2pServerCoreApi = require('./api/server/core');
 const P2pServerMessageApi = require('./api/server/message');
 const P2pServerStreamApi = require('./api/server/stream');
 const P2pServerServiceApi = require('./api/server/service');
-const {SOCKET_EVENT: {SERVER_ERROR}} = require('./util/constants');
+const {SOCKET_EVENT: {SERVER_ERROR, SERVER_PING}} = require('./util/constants');
 const Kareem = require('kareem');
 
 module.exports = function p2pServerPlugin(io, options = {}) {
@@ -25,8 +25,6 @@ module.exports = function p2pServerPlugin(io, options = {}) {
 
       p2pServerCoreApi.emitLibLog(errorMessage, {clientId, socketId: socket.id});
 
-      // Remove all listeners from old socket to avoid side effects
-      existingSocket.removeAllListeners();
       existingSocket.once('disconnect', () => {
         const msg = `p2p Socket.io lib: Duplicated clientId ${clientId} on connect, old socket disconnected, id = ${existingSocket.id}`;
         p2pServerCoreApi.emitLibLog(msg, {clientId, socketId: existingSocket.id});
@@ -36,6 +34,15 @@ module.exports = function p2pServerPlugin(io, options = {}) {
         socket.emit(SERVER_ERROR, errorMessage + ', new socket with duplicated clientId will be disconnected');
         return socket.disconnect();
       }
+
+      socket.emit(SERVER_PING, msg => p2pServerCoreApi.emitLibLog(`New socket with id ${socket.id}: ${msg}`, {
+        clientId,
+        socketId: socket.id
+      }));
+      existingSocket.emit(SERVER_PING, msg => p2pServerCoreApi.emitLibLog(`Old socket with id ${existingSocket.id}: ${msg}`, {
+        clientId,
+        socketId: existingSocket.id
+      }));
     }
 
     socket.clientId = clientId;
