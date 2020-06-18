@@ -70,7 +70,7 @@ module.exports = function (io, serverPlugin) {
                 }
 
                 if (!execError && replies) {
-                  const msg = `p2p Socket.io lib: successfully deleted key ${clientIdKey}, socketId = ${socket.id}`;
+                  const msg = `3b. p2p Socket.io lib: successfully deleted key ${clientIdKey}, socketId = ${socket.id}`;
                   serverPlugin.emitLibLog(msg, {clientId, socketId: socket.id});
                 }
 
@@ -148,7 +148,7 @@ module.exports = function (io, serverPlugin) {
             let msg;
 
             if (setErr) msg = `p2p Socket.io lib: Redis set error in syncClientList: ${setErr.stack}`;
-            else msg = `p2p Socket.io lib: successfully set key ${clientIdKey}, socketId = ${socket.id} in syncClientList`;
+            else msg = `3a. p2p Socket.io lib: successfully set key ${clientIdKey}, socketId = ${socket.id} in syncClientList`;
 
             serverPlugin.emitLibLog(msg, {clientId, socketId: socket.id});
           });
@@ -221,7 +221,7 @@ module.exports = function (io, serverPlugin) {
     const clientIdKey = REDIS_CLIENT_ID_KEY_PREFIX + clientId;
 
     redisPubClient.set(clientIdKey, socket.id, async err => {
-      let msg = `p2p Socket.io lib: successfully set key ${clientIdKey}, socketId = ${socket.id}`;
+      let msg = `3a. p2p Socket.io lib: successfully set key ${clientIdKey}, socketId = ${socket.id}`;
       if (err) msg = `p2p Socket.io lib: Redis error: ${err.stack}`;
 
       serverPlugin.emitLibLog(msg, {clientId, socketId: socket.id});
