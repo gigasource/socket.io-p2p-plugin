@@ -19,6 +19,7 @@ module.exports = function p2pServerPlugin(io, options = {}) {
     if (!clientId) return;
 
     const existingSocket = p2pServerCoreApi.getSocketByClientId(clientId);
+    p2pServerCoreApi.addSocketToConnectedSocketsMap(clientId, socket);
 
     if (existingSocket) {
       const errorMessage = `p2p Socket.io lib: Duplicated clientId ${clientId} on connect, new socket id = ${socket.id}`;

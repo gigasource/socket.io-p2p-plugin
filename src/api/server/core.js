@@ -1,7 +1,6 @@
 const {
-  SOCKET_EVENT: {SERVER_ERROR, TARGET_DISCONNECT, JOIN_ROOM, LEAVE_ROOM, EMIT_ROOM, P2P_EMIT, LIST_CLIENTS},
-  SERVER_CONFIG: {SERVER_SIDE_SOCKET_ID_POSTFIX},
-  HOOK_NAME: {POST_EMIT_TO, POST_EMIT_TO_PERSISTENT_ACK},
+  SOCKET_EVENT: {SERVER_ERROR, TARGET_DISCONNECT, JOIN_ROOM, LEAVE_ROOM, EMIT_ROOM, P2P_EMIT},
+  HOOK_NAME: {POST_EMIT_TO, POST_EMIT_TO_PERSISTENT_ACK, POST_ALL_CLIENT_SOCKETS_DISCONNECTED},
 } = require('../../util/constants');
 const findKey = require('lodash/findKey');
 const EventEmitter = require('events');
@@ -25,21 +24,21 @@ class P2pServerCoreApi {
     this.deleteMessage = options.deleteMessage;
     this.loadMessages = options.loadMessages;
     this.updateMessage = options.updateMessage;
+
+    /*
+      Due to connectivity problem, on some special cases, a client can have 2 (or more) sockets connected to server simultaneously
+      this object is used to know when all connected sockets of a client have disconnected
+      Example: {
+        client1a: ['socket1a', 'socket1b']
+      }
+     */
+    this.clientConnectedSocketsMap = {};
   }
 
-/*  addClient(clientId, clientSocketId) {
-    if (!clientId) throw new Error('clientId can not be null');
-
-    // Remove all listeners from old socket to avoid side effects
-    const oldSocket = this.getSocketByClientId(clientId);
-    if (oldSocket) oldSocket.removeAllListeners();
-
-    this.clientMap[clientId] = clientSocketId;
+  addSocketToConnectedSocketsMap(clientId, socket) {
+    this.clientConnectedSocketsMap[clientId] = this.clientConnectedSocketsMap[clientId] || [];
+    this.clientConnectedSocketsMap[clientId].push(socket.id);
   }
-
-  removeClient(clientId) {
-    delete this.clientMap[clientId];
-  }*/
 
   getClientMap() {
     const clientMap = {};
@@ -164,6 +163,11 @@ class P2pServerCoreApi {
           if (ackFunctions.length > 0) {
             ackFunctions.forEach(fn => fn(...(ackFnArgs.concat(targetClientCallbackArgs))));
           } else {
+            /*
+              NOTE: current library usage make all instances have identical ackFunctions so this code will not be executed
+              However if in the future, ackFunctions are not identical across instances, this code can be useful
+              But an improvement is required: make sure identical ackFunctions across instances are only triggered once to avoid side effects
+             */
             if (this.io.kareem.hasHooks(POST_EMIT_TO_PERSISTENT_ACK)) {
               this.io.kareem.execPost(POST_EMIT_TO_PERSISTENT_ACK, null, [ackFnName, ackFnArgs.concat(targetClientCallbackArgs)], () => {
               });
@@ -182,9 +186,20 @@ class P2pServerCoreApi {
   }
 
   createListeners(io, socket, clientId) {
-/*    socket.once('disconnect', () => {
-      this.removeClient(clientId);
-    });*/
+    socket.once('disconnect', () => {
+      if (this.clientConnectedSocketsMap[clientId]) {
+        this.clientConnectedSocketsMap[clientId] = this.clientConnectedSocketsMap[clientId].filter(e => e !== socket.id);
+
+        if (this.clientConnectedSocketsMap[clientId].length === 0) {
+          delete this.clientConnectedSocketsMap[clientId];
+
+          if (this.io.kareem.hasHooks(POST_ALL_CLIENT_SOCKETS_DISCONNECTED)) {
+            this.io.kareem.execPost(POST_ALL_CLIENT_SOCKETS_DISCONNECTED, null, [clientId, socket], () => {
+            });
+          }
+        }
+      }
+    });
 
     const p2pEmitListener = (targetClientId, event, args, acknowledgeFn) => {
       if (acknowledgeFn) args.push(acknowledgeFn);
