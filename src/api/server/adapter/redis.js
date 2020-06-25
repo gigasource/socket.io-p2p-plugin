@@ -128,10 +128,10 @@ module.exports = function (io, serverPlugin) {
     })));
   }
 
-  io.syncClientList = function () {
+  io.syncClientList = async function () {
     const instanceClients = serverPlugin.getAllClientId();
 
-    return Promise.all(instanceClients.map(clientId => {
+    const updatedClientIdList = await Promise.all(instanceClients.map(clientId => {
       return new Promise(resolve => {
         const clientIdKey = REDIS_CLIENT_ID_KEY_PREFIX + clientId;
         const socket = serverPlugin.getSocketByClientId(clientId);
@@ -153,7 +153,7 @@ module.exports = function (io, serverPlugin) {
               else msg = `3a. p2p Socket.io lib: successfully set key ${clientIdKey}, instanceId = ${thisUuid} in syncClientList`;
 
               serverPlugin.emitLibLog(msg, {clientId, socketId: socket.id});
-              resolve();
+              resolve(clientId);
             });
           } else {
             resolve();
@@ -161,6 +161,8 @@ module.exports = function (io, serverPlugin) {
         });
       });
     }));
+
+    return updatedClientIdList.filter(e => !!e);
   }
 
   getClusterClientIds((error, clusterClientIds) => {
