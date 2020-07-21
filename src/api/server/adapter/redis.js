@@ -45,7 +45,7 @@ module.exports = function (io, serverPlugin, {clusterEnabled}) {
 
   function getClusterClientIdsClusterMode(callback) {
     const masters = redisPubClient.nodes('master');
-    Promise.all(masters.map(function (node) {
+    return Promise.all(masters.map(function (node) {
       return new Promise(resolve => {
         const keySet = new Set();
         const stream = node.scanStream({
