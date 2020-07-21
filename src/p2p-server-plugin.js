@@ -86,7 +86,11 @@ module.exports = function p2pServerPlugin(io, options = {}) {
     serviceApis: p2pServerServiceApi.serviceApis,
   });
 
-  if (io._adapter.name.toLowerCase() === 'redis') require('./api/server/adapter/redis')(io, serverPlugin);
+  if (io._adapter.name.toLowerCase() === 'redis') {
+    const {redisClusterEnabled: clusterEnabled} = options;
+    // This module modifies io object
+    require('./api/server/adapter/redis')(io, serverPlugin, {clusterEnabled});
+  }
 
   return serverPlugin;
 };

@@ -12,18 +12,22 @@ const {
   },
 } = require('../../../util/constants');
 
-module.exports = function (io, serverPlugin) {
+module.exports = function (io, serverPlugin, {clusterEnabled}) {
   const thisUuid = uuidv1();
+
+  /* Single mode uses require('redis').createClient
+     Cluster mode uses require('ioredis') */
   const redisPubClient = io._adapter.pubClient;
   const redisSubClient = io._adapter.subClient;
+
   const acks = {};
-  const reviverFn = (key, value) => {
+  const jsonDataReviverFn = (key, value) => {
     if (value && value.type === 'Buffer' && Array.isArray(value.data)) return Buffer.from(value.data);
 
     return value;
   }
 
-  function getClusterClientIds(callback) {
+  function getClusterClientIdsSingleMode(callback) {
     if (callback) {
       redisPubClient.keys(REDIS_CLIENT_ID_KEY_PREFIX + '*', (err, keys) => {
         if (err) callback(err);
@@ -39,8 +43,37 @@ module.exports = function (io, serverPlugin) {
     }
   }
 
+  function getClusterClientIdsClusterMode(callback) {
+    const masters = redisPubClient.nodes('master');
+    Promise.all(masters.map(function (node) {
+      return new Promise(resolve => {
+        const keySet = new Set();
+        const stream = node.scanStream({
+          match: REDIS_CLIENT_ID_KEY_PREFIX + "*",
+          count: 100,
+        });
+
+        stream.on("data", function (resultKeys) {
+          resultKeys.forEach(keySet.add, keySet);
+        });
+        stream.on('error', function () {
+          //TODO: log or handle error
+          resolve([]);
+        })
+        stream.on("end", function () {
+          resolve([...keySet]);
+        });
+      })
+    })).then(function (arrays) {
+      const keySet = new Set();
+      arrays.forEach(array => array.forEach(keySet.add, keySet));
+      if (callback) callback([...keySet]);
+      else return [...keySet];
+    });
+  }
+
   async function getClusterClientSet() {
-    const clusterClientIds = await getClusterClientIds();
+    const clusterClientIds = await io.getClusterClientIds();
     return new Set(clusterClientIds);
   }
 
@@ -101,7 +134,7 @@ module.exports = function (io, serverPlugin) {
   /*
     use this function to get an accurate list of clients connected to cluster
    */
-  io.getClusterClientIds = getClusterClientIds;
+  io.getClusterClientIds = clusterEnabled === true ? getClusterClientIdsClusterMode : getClusterClientIdsSingleMode;
 
   /*
     use this function to remove all clients belonging to an server instance when that instance exits/be killed
@@ -165,7 +198,7 @@ module.exports = function (io, serverPlugin) {
     return updatedClientIdList.filter(e => !!e);
   }
 
-  getClusterClientIds((error, clusterClientIds) => {
+  io.getClusterClientIds((error, clusterClientIds) => {
     if (error) console.error(error);
     else io.clusterClients = new Set(clusterClientIds);
   });
@@ -185,7 +218,7 @@ module.exports = function (io, serverPlugin) {
 
         // emitTo & emitToPersistent handler
       case EMIT_TO_CHANNEL: {
-        const [originId, targetClientId, event, args, ackId] = JSON.parse(message, reviverFn);
+        const [originId, targetClientId, event, args, ackId] = JSON.parse(message, jsonDataReviverFn);
 
         if (thisUuid === originId) return; //ignore message sent from self
 
@@ -202,7 +235,7 @@ module.exports = function (io, serverPlugin) {
         break;
       }
       case EMIT_TO_PERSISTENT_ACK_CHANNEL: {
-        const [originId, ackFnName, argArray] = JSON.parse(message, reviverFn);
+        const [originId, ackFnName, argArray] = JSON.parse(message, jsonDataReviverFn);
         if (thisUuid === originId) return; //ignore message sent from self
 
         const ackFunctions = serverPlugin.ackFunctions[ackFnName] || [];
@@ -211,7 +244,7 @@ module.exports = function (io, serverPlugin) {
       }
         // support for ack functions between nodes
       case ACK_CHANNEL_PREFIX + thisUuid: {
-        const [ackId, ackArgs] = JSON.parse(message, reviverFn);
+        const [ackId, ackArgs] = JSON.parse(message, jsonDataReviverFn);
 
         const ack = acks[ackId];
         if (!ack) return;
