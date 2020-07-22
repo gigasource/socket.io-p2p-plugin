@@ -55,7 +55,7 @@ module.exports = function (io, serverPlugin, {clusterEnabled}) {
 
         stream.on("data", function (resultKeys) {
           resultKeys.forEach(key => {
-            key.slice(REDIS_CLIENT_ID_KEY_PREFIX.length);
+            key = key.slice(REDIS_CLIENT_ID_KEY_PREFIX.length);
             keySet.add(key);
           });
         });
@@ -71,7 +71,7 @@ module.exports = function (io, serverPlugin, {clusterEnabled}) {
     })).then(function (arrays) {
       const keySet = new Set();
       arrays.forEach(array => array.forEach(keySet.add, keySet));
-      if (callback) callback([...keySet]);
+      if (callback) callback(null, [...keySet]);
       else return [...keySet];
     });
   }
@@ -202,10 +202,19 @@ module.exports = function (io, serverPlugin, {clusterEnabled}) {
     return updatedClientIdList.filter(e => !!e);
   }
 
-  io.getClusterClientIds((error, clusterClientIds) => {
-    if (error) console.error(error);
-    else io.clusterClients = new Set(clusterClientIds);
-  });
+  if (clusterEnabled) {
+    redisPubClient.on('ready', () => {
+      io.getClusterClientIds((error, clusterClientIds) => {
+        if (error) serverPlugin.emitLibLog(error);
+        else io.clusterClients = new Set(clusterClientIds);
+      });
+    });
+  } else {
+    io.getClusterClientIds((error, clusterClientIds) => {
+      if (error) serverPlugin.emitLibLog(error);
+      else io.clusterClients = new Set(clusterClientIds);
+    });
+  }
 
   redisSubClient.subscribe(UPDATE_CLIENT_LIST_CHANNEL);
   redisSubClient.subscribe(EMIT_TO_CHANNEL);
