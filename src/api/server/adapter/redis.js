@@ -54,10 +54,14 @@ module.exports = function (io, serverPlugin, {clusterEnabled}) {
         });
 
         stream.on("data", function (resultKeys) {
-          resultKeys.forEach(keySet.add, keySet);
+          resultKeys.forEach(key => {
+            key.slice(REDIS_CLIENT_ID_KEY_PREFIX.length);
+            keySet.add(key);
+          });
         });
-        stream.on('error', function () {
-          //TODO: log or handle error
+        stream.on('error', function (e) {
+          const error = `Error while scanning Redis cluster keys: ${(e && e.stack) || e}`;
+          serverPlugin.emitLibLog(error);
           resolve([]);
         })
         stream.on("end", function () {
