@@ -296,7 +296,7 @@ module.exports = function (io, serverPlugin, {clusterEnabled}) {
   });
 
   io.kareem.post(POST_EMIT_TO, function (targetClientId, event, args, done) {
-    if (!io.clusterClients.has(targetClientId) && !targetClientId.endsWith(SERVER_SIDE_SOCKET_ID_POSTFIX)) {
+    if (targetClientId && !io.clusterClients.has(targetClientId) && !targetClientId.endsWith(SERVER_SIDE_SOCKET_ID_POSTFIX)) {
       done(`Client ${targetClientId} is not connected to server`);
     } else {
       const publishMessage = [thisUuid, targetClientId, event, args];
