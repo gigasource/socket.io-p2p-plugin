@@ -150,6 +150,7 @@ module.exports = function p2pServerPlugin(io) {
       if (prop === 'getClientSocketId') return p2pServerManager.getClientSocketId.bind(p2pServerManager);
       if (prop === 'getAllClientId') return p2pServerManager.getAllClientId.bind(p2pServerManager);
       if (prop === 'findClientIdBySocketId') return p2pServerManager.findClientIdBySocketId.bind(p2pServerManager);
+      if (prop === 'isClientConnected') return p2pServerManager.isClientConnected.bind(p2pServerManager);
 
       return obj[prop];
     }

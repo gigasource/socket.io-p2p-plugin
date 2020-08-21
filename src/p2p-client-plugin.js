@@ -153,6 +153,7 @@ module.exports = function p2pClientPlugin(io, clientId) {
       if (prop === 'emit2' || prop === 'emitP2p') return newApi.emit2.bind(newApi);
       if (prop === 'getClientList') return newApi.getClientList.bind(newApi);
       if (prop === 'targetClientId') return newApi.targetClientId;
+      if (prop === 'isClientConnected') return newApi.isClientConnected.bind(newApi);
 
       return obj[prop];
     }
