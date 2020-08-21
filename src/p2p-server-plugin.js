@@ -24,6 +24,10 @@ class P2pServerManager {
     return Object.keys(this.clientMap);
   }
 
+  isClientConnected(clientId) {
+    return this.clientMap[clientId] != null
+  }
+
   findClientIdBySocketId(socketId) {
     return findKey(this.clientMap, (v) => v === socketId);
   }
@@ -131,6 +135,10 @@ module.exports = function p2pServerPlugin(io) {
     socket.on(SOCKET_EVENT.LIST_CLIENTS, (clientCallbackFn) => {
       clientCallbackFn(p2pServerManager.getAllClientId());
     });
+
+    socket.on(SOCKET_EVENT.GET_CLIENT_CONNECTED_STATUS, (clientId, cb) => {
+       cb(p2pServerManager.isClientConnected(clientId))
+    })
   });
 
   return new Proxy(io, {

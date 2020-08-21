@@ -127,6 +127,20 @@ class NewApi {
       });
     }
   }
+
+  isClientConnected(clientId, successCallbackFn) {
+    if (successCallbackFn) {
+      this.io.emit(SOCKET_EVENT.GET_CLIENT_CONNECTED_STATUS, clientId, (connectedStatus) => {
+        successCallbackFn(connectedStatus)
+      })
+    } else {
+      return new Promise(resolve => {
+        this.io.emit(SOCKET_EVENT.GET_CLIENT_CONNECTED_STATUS, clientId, (connectedStatus) => {
+          resolve(connectedStatus)
+        })
+      })
+    }
+  }
 }
 
 module.exports = function p2pClientPlugin(io, clientId) {
