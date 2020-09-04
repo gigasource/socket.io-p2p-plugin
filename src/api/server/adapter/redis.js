@@ -297,6 +297,8 @@ module.exports = function (io, serverPlugin, {clusterEnabled}) {
   });
 
   io.kareem.post(POST_EMIT_TO, function (targetClientId, event, args, done) {
+    if (typeof targetClientId !== 'string' && targetClientId.toString) targetClientId = targetClientId.toString();
+
     if (targetClientId && !targetClientId.endsWith) {
       console.info(typeof targetClientId);
       console.info(targetClientId);
