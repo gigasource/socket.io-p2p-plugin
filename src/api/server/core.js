@@ -112,9 +112,12 @@ class P2pServerCoreApi {
     if (!messageId) throw new Error('saveMessage function must return a message ID');
 
     args.push((...targetClientCallbackArgs) => {
+      this.emitLibLog(`emitToPersistent: Ack received`, {event, ackFnName, targetClientId});
       this.deleteMessage(targetClientId, messageId);
 
       const ackFunctions = this.ackFunctions[ackFnName] || [];
+      this.emitLibLog(`emitToPersistent: ackFunctions length = ${ackFunctions.length}`, {event, ackFnName, targetClientId});
+
       ackFunctions.forEach(fn => fn(...(ackFnArgs.concat(targetClientCallbackArgs))));
     });
     this.emitTo(targetClientId, event, ...args);
