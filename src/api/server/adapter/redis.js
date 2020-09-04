@@ -263,6 +263,7 @@ module.exports = function (io, serverPlugin, {clusterEnabled}) {
         if (!ack) return;
 
         ack(...ackArgs);
+        delete acks[ackId];
         break;
       }
     }
