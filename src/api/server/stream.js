@@ -175,7 +175,6 @@ class ServerSideDuplex extends Duplex {
 
   _destroy() {
     this.removeSocketListeners();
-    this.coreApi.virtualClients.delete(this.sourceClientId);
 
     this.coreApi.emitTo(this.targetClientId, PEER_STREAM_DESTROYED, this.sourceStreamId);
   };
@@ -191,11 +190,20 @@ class ServerSideDuplex extends Duplex {
 
     if (timeout) {
       if (typeof timeout !== 'number') throw new Error('timeout must be a number');
-      destroyTimeout = setTimeout(() => !this.destroyed && this.destroy(), timeout);
+
+      destroyTimeout = setTimeout(() => {
+        if (!this.destroyed) {
+          this.destroy();
+          this.coreApi.virtualClients.delete(this.sourceClientId);
+        }
+      }, timeout);
     }
 
     this.once('finish', () => {
-      if (!this.destroyed) this.destroy();
+      if (!this.destroyed) {
+        this.destroy();
+        this.coreApi.virtualClients.delete(this.sourceClientId);
+      }
       if (destroyTimeout) clearTimeout(destroyTimeout);
     });
 
