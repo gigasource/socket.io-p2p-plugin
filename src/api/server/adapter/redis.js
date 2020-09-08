@@ -233,12 +233,20 @@ module.exports = function (io, serverPlugin, {clusterEnabled}) {
       case EMIT_TO_CHANNEL: {
         const [originId, targetClientId, event, args, ackId] = JSON.parse(message, jsonDataReviverFn);
 
+        serverPlugin.emitLibLog(`In EMIT_TO_CHANNEL, ackId = ${ackId}`, {thisUuid, originId, targetClientId, event, args, ackId});
+
         if (thisUuid === originId) return; //ignore message sent from self
 
         const emitArgs = [targetClientId, event, ...args];
-        if (ackId) emitArgs.push((...ackArgs) => {
-          redisPubClient.publish(ACK_CHANNEL_PREFIX + originId, JSON.stringify([ackId, ackArgs]));
-        });
+
+        if (ackId) {
+          emitArgs.push((...ackArgs) => {
+            serverPlugin.emitLibLog(`Publish msg to ${ACK_CHANNEL_PREFIX + originId}, ackId = ${ackId}`,
+                {thisUuid, originId, targetClientId, event, args, ackId});
+
+            redisPubClient.publish(ACK_CHANNEL_PREFIX + originId, JSON.stringify([ackId, ackArgs]));
+          });
+        }
 
         //emitTo requires a real socket
         if (serverPlugin.getSocketByClientId(targetClientId)) serverPlugin.emitTo(...emitArgs);
@@ -258,10 +266,12 @@ module.exports = function (io, serverPlugin, {clusterEnabled}) {
         // support for ack functions between nodes
       case ACK_CHANNEL_PREFIX + thisUuid: {
         const [ackId, ackArgs] = JSON.parse(message, jsonDataReviverFn);
+        serverPlugin.emitLibLog(`In ${ACK_CHANNEL_PREFIX + thisUuid}, ackId = ${ackId}`, {thisUuid, ackId});
 
         const ack = acks[ackId];
         if (!ack) return;
 
+        serverPlugin.emitLibLog(`Call ack with ackId = ${ackId}`, {thisUuid, ackId});
         ack(...ackArgs);
         delete acks[ackId];
         break;
