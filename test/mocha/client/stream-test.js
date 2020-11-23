@@ -29,23 +29,72 @@ describe('Client Stream API', function () {
     await wait(50);
   });
 
+  /* deprecated
   describe('constructor', function () {
     it('should listen to CREATE_STREAM event', async function () {
       expect(client1.listeners(SOCKET_EVENT.CREATE_STREAM)).to.have.lengthOf(1);
     });
-  });
+  });*/
 
   describe('addP2pStream function', function () {
+    /* deprecated
     it('should throw error if peer is not listening to add stream event', function () {
       return expect(client2.addP2pStream(client1.clientId, {})).to.be.rejected;
-    });
+    });*/
     it('should return a Duplex if peer is listening to add stream event', async function () {
       client2.onAddP2pStream();
       const duplex = await client1.addP2pStream(client2.clientId, {});
       expect(duplex instanceof Duplex).to.equal(true);
     });
+    it('should transfer data to correct channel', async function () {
+      const channel1 = 'channel1';
+      const channel2 = 'random-channel-2';
+
+      let result1 = [];
+      let result2 = [];
+
+      let input1 = [...new Array(40)].map(() => Math.round(Math.random() * 100) + '1');
+      let input2 = [...new Array(50)].map(() => Math.round(Math.random() * 100) + '2');
+
+      expect(JSON.stringify(input1)).to.not.equal(JSON.stringify(input2));
+
+      const channel1Handler = function (duplex1) {
+        duplex1.on('data', chunk => result1.push(chunk.toString()));
+      }
+
+      const channel2Handler = function (duplex2) {
+        duplex2.on('data', chunk => result2.push(chunk.toString()));
+      }
+
+      // NOTE: only 1 handler will be run -> only 1 handler for 1 channel
+      client2.onAddP2pStream(channel1, channel1Handler);
+      client2.onAddP2pStream(channel1, channel1Handler);
+      client2.onAddP2pStream(channel1, channel1Handler);
+      client2.onAddP2pStream(channel2, channel2Handler);
+      client2.onAddP2pStream(channel2, channel2Handler);
+
+      expect(client2.listeners(SOCKET_EVENT.CREATE_STREAM).length).to.equal(0);
+      expect(client2.listeners(`${SOCKET_EVENT.CREATE_STREAM}-CHANNEL-${channel1}`).length).to.equal(1);
+      expect(client2.listeners(`${SOCKET_EVENT.CREATE_STREAM}-CHANNEL-${channel2}`).length).to.equal(1);
+
+      const channel1Duplex = await client1.addP2pStream(client2.clientId, channel1);
+      const channel2Duplex = await client1.addP2pStream(client2.clientId, channel2);
+
+      streamify(input1).pipe(channel1Duplex);
+      streamify(input2).pipe(channel2Duplex);
+
+      await wait(200);
+
+      expect(result1).to.have.lengthOf(input1.length);
+      expect(result2).to.have.lengthOf(input2.length);
+      expect(result1[0]).to.equal(input1[0]);
+      expect(result2[0]).to.equal(input2[0]);
+      expect(result1[result1.length - 1]).to.equal(input1[result1.length - 1]);
+      expect(result2[result2.length - 1]).to.equal(input2[result2.length - 1]);
+    });
   });
   describe('onAddP2pStream function', function () {
+    /* deprecated
     it('should remove default listener from constructor', async function () {
       let initialListener, newListener;
 
@@ -61,7 +110,7 @@ describe('Client Stream API', function () {
       newListener = client2.listeners(SOCKET_EVENT.CREATE_STREAM)[0];
 
       expect(initialListener === newListener).to.equal(false);
-    });
+    });*/
     it('should remove old listeners if called more than once', function () {
       client2.onAddP2pStream({}, () => {
       });
@@ -77,7 +126,9 @@ describe('Client Stream API', function () {
         expect(duplex instanceof Duplex).to.equal(true);
         done();
       });
-      client1.addP2pStream(client2.clientId, {});
+
+      client1.addP2pStream(client2.clientId, {}, () => {
+      });
     });
   })
   describe('the returned Duplex', function () {

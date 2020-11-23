@@ -1,7 +1,7 @@
 const chai = require('chai');
 const chaiAsPromised = require('chai-as-promised');
 const expect = chai.expect;
-const {SOCKET_EVENT: {P2P_EMIT_STREAM, STREAM_IDENTIFIER_PREFIX, PEER_STREAM_DESTROYED, TARGET_DISCONNECT}}
+const {SOCKET_EVENT: {P2P_EMIT_STREAM, STREAM_IDENTIFIER_PREFIX, PEER_STREAM_DESTROYED, TARGET_DISCONNECT, CREATE_STREAM}}
     = require('../../../src/util/constants');
 const {startServer, stopServer, startClients, wait, terminateClients} = require('../common');
 const {Duplex} = require('stream');
@@ -34,13 +34,60 @@ describe('Stream API for p2p server as p2p client', function () {
 
   describe('Server Stream API', function () {
     describe('addStreamAsClient function', function () {
+      /* deprecated
       it('should throw error if peer is not listening to add stream event', function () {
         return expect(server.addStreamAsClient(client1.clientId, {})).to.be.rejected;
-      });
+      });*/
       it('should return a Duplex if peer is listening to add stream event', async function () {
         client1.onAddP2pStream();
         const duplex = await server.addStreamAsClient(client1.clientId, {});
         expect(duplex instanceof Duplex).to.equal(true);
+      });
+      it('should transfer data to correct channel', async function () {
+        const channel1 = 'channel1';
+        const channel2 = 'random-channel-2';
+
+        let result1 = [];
+        let result2 = [];
+
+        let input1 = [...new Array(40)].map(() => Math.round(Math.random() * 100) + '1');
+        let input2 = [...new Array(50)].map(() => Math.round(Math.random() * 100) + '2');
+
+        expect(JSON.stringify(input1)).to.not.equal(JSON.stringify(input2));
+
+        const channel1Handler = function (duplex1) {
+          duplex1.on('data', chunk => result1.push(chunk.toString()));
+        }
+
+        const channel2Handler = function (duplex2) {
+          duplex2.on('data', chunk => result2.push(chunk.toString()));
+        }
+
+        // NOTE: only 1 handler will be run -> only 1 handler for 1 channel
+        client2.onAddP2pStream(channel1, channel1Handler);
+        client2.onAddP2pStream(channel1, channel1Handler);
+        client2.onAddP2pStream(channel1, channel1Handler);
+        client2.onAddP2pStream(channel2, channel2Handler);
+        client2.onAddP2pStream(channel2, channel2Handler);
+
+        expect(client2.listeners(CREATE_STREAM).length).to.equal(0);
+        expect(client2.listeners(`${CREATE_STREAM}-CHANNEL-${channel1}`).length).to.equal(1);
+        expect(client2.listeners(`${CREATE_STREAM}-CHANNEL-${channel2}`).length).to.equal(1);
+
+        const channel1Duplex = await server.addStreamAsClient(client2.clientId, channel1);
+        const channel2Duplex = await server.addStreamAsClient(client2.clientId, channel2);
+
+        streamify(input1).pipe(channel1Duplex);
+        streamify(input2).pipe(channel2Duplex);
+
+        await wait(200);
+
+        expect(result1).to.have.lengthOf(input1.length);
+        expect(result2).to.have.lengthOf(input2.length);
+        expect(result1[0]).to.equal(input1[0]);
+        expect(result2[0]).to.equal(input2[0]);
+        expect(result1[result1.length - 1]).to.equal(input1[result1.length - 1]);
+        expect(result2[result2.length - 1]).to.equal(input2[result2.length - 1]);
       });
     });
     describe('the returned Duplex', function () {

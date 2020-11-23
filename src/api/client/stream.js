@@ -1,6 +1,7 @@
 const {Duplex} = require('stream');
 const {
   SOCKET_EVENT: {CREATE_STREAM, P2P_EMIT_STREAM, STREAM_IDENTIFIER_PREFIX, PEER_STREAM_DESTROYED, TARGET_DISCONNECT},
+  MISC_CONFIG: {INIT_STREAM_TIMEOUT},
 } = require('../../util/constants');
 const uuidv1 = require('uuid/v1');
 
@@ -9,14 +10,22 @@ class P2pClientStreamApi {
     this.socket = socket;
     this.p2pClientMessageApi = p2pMultiMessageApi;
     this.clientId = p2pMultiMessageApi.clientId;
-
-    // returns false if client haven't used onAddP2pStream function -> notify peer that this client is not ready
-    this.socket.on(CREATE_STREAM, (connectionInfo, serverCallback) => {
-      serverCallback(`Client ${this.clientId} is not ready for streaming, onAddP2pStream function is required`);
-    });
   }
 
-  addP2pStream(targetClientId, duplexOptions, callback) {
+  addP2pStream(targetClientId, channelOrArgArray, duplexOptions, callback) {
+    let channel;
+    let argArray;
+
+    if (typeof channelOrArgArray === 'string') {
+      channel = channelOrArgArray;
+    } else if (Array.isArray(channelOrArgArray)) {
+      argArray = channelOrArgArray;
+    } else {
+      // backward compatibility
+      callback = duplexOptions;
+      duplexOptions = channelOrArgArray;
+    }
+
     const {sourceStreamId, targetStreamId, ...duplexOpts} = duplexOptions || {};
 
     const connectionInfo = {
@@ -24,6 +33,8 @@ class P2pClientStreamApi {
       targetStreamId: targetStreamId || uuidv1(),
       // sourceClientId will be set on server
       targetClientId: targetClientId,
+      ...channel && {channel},
+      ...argArray && {argArray},
     };
 
     if (callback) {
@@ -35,7 +46,13 @@ class P2pClientStreamApi {
       });
     } else {
       return new Promise((resolve, reject) => {
+        const timeout = duplexOpts.initStreamTimeout || INIT_STREAM_TIMEOUT;
+        const cancelTimeout = setTimeout(() =>
+                reject(`addP2pStream error: target client response timeout (${timeout}ms) exceeded`),
+            timeout);
+
         this.socket.emit(CREATE_STREAM, connectionInfo, (err) => {
+          clearTimeout(cancelTimeout);
           if (err) return reject(err);
 
           const duplex = this.createClientStream(connectionInfo, duplexOpts);
@@ -45,25 +62,50 @@ class P2pClientStreamApi {
     }
   }
 
-  onAddP2pStream(duplexOptions, clientCallback) {
-    if (!clientCallback && typeof duplexOptions === 'function') {
-      clientCallback = duplexOptions;
-      duplexOptions = {};
+  onAddP2pStream(channelOrDuplexOptions, clientCallback, duplexOptions) {
+    let channel;
+
+    if (typeof channelOrDuplexOptions === 'string') {
+      // onAddP2pStream('channel', (duplex) => {}, {})
+      duplexOptions = duplexOptions || {};
+      channel = channelOrDuplexOptions;
+    } else if (typeof channelOrDuplexOptions === 'function') {
+      // onAddP2pStream((duplex) => {}, {}) or onAddP2pStream((duplex) => {})
+      duplexOptions = clientCallback || {};
+      clientCallback = channelOrDuplexOptions;
+    } else if (typeof channelOrDuplexOptions === 'object' && typeof clientCallback === 'function') {
+      // backward compatibility
+      // onAddP2pStream({}, (duplex) => {})
+      duplexOptions = channelOrDuplexOptions;
+    } else {
+      if (arguments.length > 0) throw new Error('Invalid usage of parameters');
     }
 
-    this.offAddP2pStream();
-    this.socket.on(CREATE_STREAM, (connectionInfo, serverCallback) => {
+    let event = CREATE_STREAM;
+    if (channel) event += `-CHANNEL-${channel}`;
+
+    this.offAddP2pStream(channel);
+
+    this.socket.on(event, (connectionInfo, serverCallback) => {
       [connectionInfo.sourceClientId, connectionInfo.targetClientId] = [connectionInfo.targetClientId, connectionInfo.sourceClientId];
       [connectionInfo.sourceStreamId, connectionInfo.targetStreamId] = [connectionInfo.targetStreamId, connectionInfo.sourceStreamId];
 
       const duplex = this.createClientStream(connectionInfo, duplexOptions);
-      if (clientCallback) clientCallback(duplex); // return a Duplex to the calling client
+
+      if (clientCallback) {
+        // return a Duplex to the calling client
+        if (Array.isArray(connectionInfo.argArray)) clientCallback(duplex, connectionInfo.argArray);
+        else clientCallback(duplex);
+      }
+
       if (serverCallback) serverCallback(); // return result to peer to create stream on the other end of the connection
     });
   }
 
-  offAddP2pStream() {
-    this.socket.off(CREATE_STREAM);
+  offAddP2pStream(channel) {
+    let event = CREATE_STREAM;
+    if (channel) event += `-CHANNEL-${channel}`;
+    this.socket.off(event);
   }
 
   createClientStream(connectionInfo, options = {}) {

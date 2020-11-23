@@ -4,7 +4,8 @@ const {
     STREAM_IDENTIFIER_PREFIX,
   },
   INTERNAL_EMITTER_EVENT: {DATA_FROM_ANOTHER_SERVER},
-  SERVER_CONFIG: {SERVER_SIDE_SOCKET_ID_POSTFIX}
+  SERVER_CONFIG: {SERVER_SIDE_SOCKET_ID_POSTFIX},
+  MISC_CONFIG: {INIT_STREAM_TIMEOUT},
 } = require('../../util/constants');
 const {Duplex} = require('stream');
 const uuidv1 = require('uuid/v1');
@@ -38,7 +39,7 @@ class P2pServerStreamApi {
 
     // stream for normal socket connection
     socket.on(CREATE_STREAM, (connectionInfo, callback) => {
-      const {targetClientId} = connectionInfo;
+      const {targetClientId, channel} = connectionInfo;
       connectionInfo.sourceClientId = clientId;
 
       const targetClientSocket = this.coreApi.getSocketByClientId(targetClientId);
@@ -46,11 +47,26 @@ class P2pServerStreamApi {
 
       this.coreApi.addTargetDisconnectListeners(socket, targetClientSocket, clientId, targetClientId);
 
-      targetClientSocket.emit(CREATE_STREAM, connectionInfo, callback);
+      let event = CREATE_STREAM;
+      if (channel) event += `-CHANNEL-${channel}`;
+      targetClientSocket.emit(event, connectionInfo, callback);
     });
   }
 
-  addStreamAsClient(targetClientId, duplexOptions, callback) {
+  addStreamAsClient(targetClientId, channelOrArgArray, duplexOptions, callback) {
+    let channel;
+    let argArray;
+
+    if (typeof channelOrArgArray === 'string') {
+      channel = channelOrArgArray;
+    } else if (Array.isArray(channelOrArgArray)) {
+      argArray = channelOrArgArray;
+    } else {
+      // backward compatibility
+      callback = duplexOptions;
+      duplexOptions = channelOrArgArray;
+    }
+
     const {sourceStreamId, targetStreamId, ...duplexOpts} = duplexOptions || {};
 
     const connectionInfo = {
@@ -58,10 +74,15 @@ class P2pServerStreamApi {
       targetStreamId: targetStreamId || uuidv1(),
       sourceClientId: uuidv1() + SERVER_SIDE_SOCKET_ID_POSTFIX,
       targetClientId: targetClientId,
+      ...channel && {channel},
+      ...argArray && {argArray},
     };
 
+    let event = CREATE_STREAM;
+    if (channel) event += `-CHANNEL-${channel}`;
+
     if (callback) {
-      this.coreApi.emitTo(targetClientId, CREATE_STREAM, connectionInfo, err => {
+      this.coreApi.emitTo(targetClientId, event, connectionInfo, err => {
         if (err) return callback(err);
 
         const duplex = new ServerSideDuplex(this.coreApi, connectionInfo, duplexOpts);
@@ -69,7 +90,13 @@ class P2pServerStreamApi {
       });
     } else {
       return new Promise((resolve, reject) => {
-        this.coreApi.emitTo(targetClientId, CREATE_STREAM, connectionInfo, err => {
+        const timeout = duplexOpts.initStreamTimeout || INIT_STREAM_TIMEOUT;
+        const cancelTimeout = setTimeout(() =>
+                reject(`addP2pStream error: target client response timeout (${timeout}ms) exceeded`),
+            timeout);
+
+        this.coreApi.emitTo(targetClientId, event, connectionInfo, err => {
+          clearTimeout(cancelTimeout);
           if (err) return reject(err);
 
           const duplex = new ServerSideDuplex(this.coreApi, connectionInfo, duplexOpts);
@@ -118,15 +145,15 @@ class ServerSideDuplex extends Duplex {
 
     // Socket.IO Lifecycle
     this.onDisconnect = options.onDisconnect || (() => {
-      if (!this.destroyed) this.cleanup(5000);
+      if (!this.destroyed) this._cleanup(5000);
     });
 
     this.onTargetDisconnect = options.onTargetDisconnect || (([targetClientId]) => {
-      if (this.targetClientId === targetClientId && !this.destroyed) this.cleanup(5000);
+      if (this.targetClientId === targetClientId && !this.destroyed) this._cleanup(5000);
     });
 
     this.onTargetStreamDestroyed = options.onTargetStreamDestroyed || (([targetStreamId]) => {
-      if (this.targetStreamId === targetStreamId && !this.destroyed) this.cleanup(5000);
+      if (this.targetStreamId === targetStreamId && !this.destroyed) this._cleanup(5000);
     });
 
     // Socket.IO events
@@ -177,6 +204,7 @@ class ServerSideDuplex extends Duplex {
     this.removeSocketListeners();
 
     this.coreApi.emitTo(this.targetClientId, PEER_STREAM_DESTROYED, this.sourceStreamId);
+    this._cleanup(5000, true);
   };
 
   /*
@@ -184,7 +212,7 @@ class ServerSideDuplex extends Duplex {
     Sometimes if p2p stream is destroyed immediately, other streams can still try to write to p2p stream,
     causing ERR_STREAM_DESTROYED error
    */
-  cleanup(timeout) {
+  _cleanup(timeout, calledByDestroyFunction) {
     // The timeout is to make sure if 'finish' event is not called (no data left to write), stream will still be destroyed
     let destroyTimeout;
 
@@ -200,10 +228,8 @@ class ServerSideDuplex extends Duplex {
     }
 
     this.once('finish', () => {
-      if (!this.destroyed) {
-        this.destroy();
-        this.coreApi.virtualClients.delete(this.sourceClientId);
-      }
+      this.coreApi.virtualClients.delete(this.sourceClientId);
+      if (!this.destroyed && !calledByDestroyFunction) this.destroy();
       if (destroyTimeout) clearTimeout(destroyTimeout);
     });
 
