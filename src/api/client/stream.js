@@ -12,18 +12,25 @@ class P2pClientStreamApi {
     this.clientId = p2pMultiMessageApi.clientId;
   }
 
-  addP2pStream(targetClientId, channelOrArgArray, duplexOptions, callback) {
+  addP2pStream(targetClientId, channelOrArgArrayOrCallback, duplexOptions, callback) {
     let channel;
     let argArray;
 
-    if (typeof channelOrArgArray === 'string') {
-      channel = channelOrArgArray;
-    } else if (Array.isArray(channelOrArgArray)) {
-      argArray = channelOrArgArray;
+    if (typeof channelOrArgArrayOrCallback === 'string') {
+      // addP2pStream('clientId', 'channel', {}, () => {});
+      channel = channelOrArgArrayOrCallback;
+    } else if (Array.isArray(channelOrArgArrayOrCallback)) {
+      // addP2pStream('clientId', [1, 2, 3], {}, () => {});
+      argArray = channelOrArgArrayOrCallback;
+    } else if (typeof channelOrArgArrayOrCallback === 'function') {
+      // addP2pStream('clientId', () => {});
+      callback = channelOrArgArrayOrCallback;
+      duplexOptions = {};
     } else {
       // backward compatibility
+      // addP2pStream('clientId', {}, () => {});
       callback = duplexOptions;
-      duplexOptions = channelOrArgArray;
+      duplexOptions = channelOrArgArrayOrCallback;
     }
 
     const {sourceStreamId, targetStreamId, ...duplexOpts} = duplexOptions || {};
@@ -191,6 +198,7 @@ class P2pClientStreamApi {
 
     duplex._destroy = () => {
       removeSocketListeners();
+      duplex.emit('close');
       this.p2pClientMessageApi.emitTo(targetClientId, PEER_STREAM_DESTROYED, sourceStreamId);
     };
 

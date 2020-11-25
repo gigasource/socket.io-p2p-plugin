@@ -53,18 +53,25 @@ class P2pServerStreamApi {
     });
   }
 
-  addStreamAsClient(targetClientId, channelOrArgArray, duplexOptions, callback) {
+  addStreamAsClient(targetClientId, channelOrArgArrayOrCallback, duplexOptions, callback) {
     let channel;
     let argArray;
 
-    if (typeof channelOrArgArray === 'string') {
-      channel = channelOrArgArray;
-    } else if (Array.isArray(channelOrArgArray)) {
-      argArray = channelOrArgArray;
+    if (typeof channelOrArgArrayOrCallback === 'string') {
+      // addStreamAsClient('clientId', 'channel', {}, () => {});
+      channel = channelOrArgArrayOrCallback;
+    } else if (Array.isArray(channelOrArgArrayOrCallback)) {
+      // addStreamAsClient('clientId', [1, 2, 3], {}, () => {});
+      argArray = channelOrArgArrayOrCallback;
+    } else if (typeof channelOrArgArrayOrCallback === 'function') {
+      // addStreamAsClient('clientId', () => {});
+      callback = channelOrArgArrayOrCallback;
+      duplexOptions = {};
     } else {
       // backward compatibility
+      // addStreamAsClient('clientId', {}, () => {});
       callback = duplexOptions;
-      duplexOptions = channelOrArgArray;
+      duplexOptions = channelOrArgArrayOrCallback;
     }
 
     const {sourceStreamId, targetStreamId, ...duplexOpts} = duplexOptions || {};
@@ -203,8 +210,9 @@ class ServerSideDuplex extends Duplex {
   _destroy() {
     this.removeSocketListeners();
 
-    this.coreApi.emitTo(this.targetClientId, PEER_STREAM_DESTROYED, this.sourceStreamId);
     this._cleanup(5000, true);
+    this.emit('close');
+    this.coreApi.emitTo(this.targetClientId, PEER_STREAM_DESTROYED, this.sourceStreamId);
   };
 
   /*

@@ -409,5 +409,25 @@ describe('Client Stream API', function () {
       expect(client4.listeners('disconnect')).to.have.lengthOf(originalDisconnectListenerCount);
       expect(client1.listeners('disconnect')).to.have.lengthOf(originalDisconnectListenerCount);
     });
+    it('should emit "close" event on both streams when destroyed', function (done) {
+      let result = '';
+
+      client2.onAddP2pStream((targetDuplex) => {
+        targetDuplex.on('close', () => {
+          result += 'B';
+          expect(result).to.equal('AB');
+          done();
+        });
+      });
+
+      client1.addP2pStream(client2.clientId, async (sourceDuplex) => {
+        sourceDuplex.on('close', () => {
+          result += 'A';
+        });
+
+        await wait(50); // wait for target duplex to be created
+        sourceDuplex.destroy();
+      });
+    });
   });
 })

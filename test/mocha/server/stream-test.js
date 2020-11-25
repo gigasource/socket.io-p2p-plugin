@@ -291,6 +291,26 @@ describe('Stream API for p2p server as p2p client', function () {
         expect(server.virtualClients).to.have.lengthOf(0);
         expect(server.virtualClients.has(serverDuplex.sourceClientId)).to.equal(false);
       });
+      it('should emit "close" event on both streams when destroyed', function (done) {
+        let result = '';
+
+        client2.onAddP2pStream((targetDuplex) => {
+          targetDuplex.on('close', () => {
+            result += 'B';
+            expect(result).to.equal('AB');
+            done();
+          });
+        });
+
+        server.addStreamAsClient(client2.clientId, async (sourceDuplex) => {
+          sourceDuplex.on('close', () => {
+            result += 'A';
+          });
+
+          await wait(50); // wait for target duplex to be created
+          sourceDuplex.destroy();
+        });
+      });
     });
   });
 });
