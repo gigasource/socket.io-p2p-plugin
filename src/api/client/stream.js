@@ -134,25 +134,30 @@ class P2pClientStreamApi {
 
     // Socket.IO Lifecycle
     const onDisconnect = options.onDisconnect || function () {
-      if (!duplex.destroyed) duplex.cleanup(5000);
+      if (!duplex.destroyed) duplex._cleanup();
     };
 
     const onTargetDisconnect = options.onTargetDisconnect || function (targetClientId) {
-      if (duplex.targetClientId === targetClientId && !duplex.destroyed) duplex.cleanup(5000);
+      if (duplex.targetClientId === targetClientId && !duplex.destroyed) duplex._cleanup();
     }
 
     const onTargetStreamDestroyed = options.onTargetStreamDestroyed || function (targetStreamId) {
-      if (duplex.targetStreamId === targetStreamId && !duplex.destroyed) duplex.cleanup(5000);
+      if (duplex.targetStreamId === targetStreamId && !duplex.destroyed) duplex._cleanup();
     }
 
     // Socket.IO events
     const onReceiveStreamData = (chunk, callbackFn) => {
-      if (chunk instanceof Array) chunk = Buffer.from(chunk);
-
-      if (!duplex.push(chunk)) { // if reach highWaterMark -> signal the other client to pause writing
-        writeCallbackFn = callbackFn;
-      } else {
+      if (chunk === null) {
+        duplex.emit('end');
         callbackFn();
+      } else {
+        if (Array.isArray(chunk) || typeof chunk === 'string') chunk = Buffer.from(chunk);
+
+        if (!duplex.push(chunk)) { // if reach highWaterMark -> signal the other client to pause writing
+          writeCallbackFn = callbackFn;
+        } else {
+          callbackFn();
+        }
       }
     }
 
@@ -197,31 +202,36 @@ class P2pClientStreamApi {
     };
 
     duplex._destroy = () => {
+      this.p2pClientMessageApi.emitTo(targetClientId, PEER_STREAM_DESTROYED, sourceStreamId);
       removeSocketListeners();
       duplex.emit('close');
-      this.p2pClientMessageApi.emitTo(targetClientId, PEER_STREAM_DESTROYED, sourceStreamId);
     };
+
+    const originalEndFn = duplex.end.bind(duplex);
+    duplex.end = (...args) => {
+      const [chunk, encoding, callback] = args;
+
+      const sendNullChunk = () => {
+        duplex._write(null, encoding, () => {
+          if (typeof callback === 'function') callback();
+          originalEndFn();
+        });
+      }
+
+      if (args.length) {
+        duplex._write(chunk, encoding, () => sendNullChunk());
+      } else {
+        sendNullChunk();
+      }
+    }
 
     /*
       This is to avoid write after destroyed error
       Sometimes if p2p stream is destroyed immediately, other streams can still try to write to p2p stream,
       causing ERR_STREAM_DESTROYED error
      */
-    duplex.cleanup = timeout => {
-      // The timeout is to make sure if 'finish' event is not called (no data left to write), stream will still be destroyed
-      let destroyTimeout;
-
-      if (timeout) {
-        if (typeof timeout !== 'number') throw new Error('timeout must be a number');
-        destroyTimeout = setTimeout(() => !duplex.destroyed && duplex.destroy(), timeout);
-      }
-
-      duplex.once('finish', () => {
-        if (!duplex.destroyed) duplex.destroy();
-        if (destroyTimeout) clearTimeout(destroyTimeout);
-      });
-
-      duplex.end();
+    duplex._cleanup = () => {
+      if (!duplex.destroyed) duplex.destroy();
     }
 
     return duplex;

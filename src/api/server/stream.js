@@ -152,26 +152,32 @@ class ServerSideDuplex extends Duplex {
 
     // Socket.IO Lifecycle
     this.onDisconnect = options.onDisconnect || (() => {
-      if (!this.destroyed) this._cleanup(5000);
+      if (!this.destroyed) this._cleanup();
     });
 
     this.onTargetDisconnect = options.onTargetDisconnect || (([targetClientId]) => {
-      if (this.targetClientId === targetClientId && !this.destroyed) this._cleanup(5000);
+      if (this.targetClientId === targetClientId && !this.destroyed) this._cleanup();
     });
 
     this.onTargetStreamDestroyed = options.onTargetStreamDestroyed || (([targetStreamId]) => {
-      if (this.targetStreamId === targetStreamId && !this.destroyed) this._cleanup(5000);
+      if (this.targetStreamId === targetStreamId && !this.destroyed) this._cleanup();
     });
 
     // Socket.IO events
     this.onReceiveStreamData = (data, callbackFn) => {
       let [chunk] = data;
-      if (chunk instanceof Array) chunk = Buffer.from(chunk);
 
-      if (!this.push(chunk)) { // if reach highWaterMark -> signal the other client to pause writing
-        this.writeCallbackFn = callbackFn;
-      } else {
+      if (chunk === null) {
+        this.emit('end');
         callbackFn();
+      } else {
+        if (Array.isArray(chunk) || typeof chunk === 'string') chunk = Buffer.from(chunk);
+
+        if (!this.push(chunk)) { // if reach highWaterMark -> signal the other client to pause writing
+          this.writeCallbackFn = callbackFn;
+        } else {
+          callbackFn();
+        }
       }
     };
 
@@ -208,40 +214,39 @@ class ServerSideDuplex extends Duplex {
   };
 
   _destroy() {
-    this.removeSocketListeners();
+    const targetClientSocket = this.coreApi.getSocketByClientId(this.targetClientId);
+    if (targetClientSocket) this.coreApi.emitTo(this.targetClientId, PEER_STREAM_DESTROYED, this.sourceStreamId);
 
-    this._cleanup(5000, true);
+    this.removeSocketListeners();
     this.emit('close');
-    this.coreApi.emitTo(this.targetClientId, PEER_STREAM_DESTROYED, this.sourceStreamId);
+    this.coreApi.virtualClients.delete(this.sourceClientId);
   };
+
+  end(...args) {
+    const [chunk, encoding, callback] = args;
+
+    const sendNullChunk = () => {
+      this._write(null, encoding, () => {
+        if (typeof callback === 'function') callback();
+        super.end();
+      });
+    }
+
+    if (args.length) {
+      this._write(chunk, encoding, () => sendNullChunk());
+    } else {
+      sendNullChunk();
+    }
+  }
 
   /*
     This is to avoid write after destroyed error
     Sometimes if p2p stream is destroyed immediately, other streams can still try to write to p2p stream,
     causing ERR_STREAM_DESTROYED error
    */
-  _cleanup(timeout, calledByDestroyFunction) {
-    // The timeout is to make sure if 'finish' event is not called (no data left to write), stream will still be destroyed
-    let destroyTimeout;
-
-    if (timeout) {
-      if (typeof timeout !== 'number') throw new Error('timeout must be a number');
-
-      destroyTimeout = setTimeout(() => {
-        if (!this.destroyed) {
-          this.destroy();
-          this.coreApi.virtualClients.delete(this.sourceClientId);
-        }
-      }, timeout);
-    }
-
-    this.once('finish', () => {
-      this.coreApi.virtualClients.delete(this.sourceClientId);
-      if (!this.destroyed && !calledByDestroyFunction) this.destroy();
-      if (destroyTimeout) clearTimeout(destroyTimeout);
-    });
-
-    this.end();
+  _cleanup() {
+    this.coreApi.virtualClients.delete(this.sourceClientId);
+    if (!this.destroyed) this.destroy();
   }
 }
 

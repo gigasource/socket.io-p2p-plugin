@@ -205,7 +205,7 @@ class P2pServerCoreApi {
     });
 
     const p2pEmitListener = (targetClientId, event, args, acknowledgeFn) => {
-      if (acknowledgeFn) args.push(acknowledgeFn);
+      if (acknowledgeFn) args = [...args, acknowledgeFn];
       const targetClientSocket = this.getSocketByClientId(targetClientId);
 
       if (!targetClientSocket) {

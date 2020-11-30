@@ -285,6 +285,66 @@ describe('Client Stream API', function () {
 
       expect(duplex1 === duplex2).to.equal(false);
     });
+    it('should be able to send last chunk of data with .end()', function (done) {
+      let count = 0;
+
+      client2.onAddP2pStream((targetDuplex) => {
+        let result;
+
+        targetDuplex.on('data', (data) => {
+          if (data) result = +data.toString();
+        });
+
+        targetDuplex.on('end', () => {
+          expect(result).to.equal(2);
+          expect(count).to.equal(2);
+          done();
+        });
+      });
+
+      client1.addP2pStream(client2.clientId, async (sourceDuplex) => {
+        await wait(50);
+        count++;
+        sourceDuplex.write('randomData');
+        await wait(100);
+        count++;
+        sourceDuplex.end(`${count}`);
+      });
+    });
+    it('should trigger .end() callback after "end" event and before "finish" event', function (done) {
+      let count = 0;
+
+      client2.onAddP2pStream((targetDuplex) => {
+        let result;
+
+        targetDuplex.on('data', (data) => {
+          if (data) result = +data.toString();
+        });
+
+        targetDuplex.on('end', () => {
+          expect(result).to.equal(2);
+          expect(count).to.equal(2);
+        });
+      });
+
+      client1.addP2pStream(client2.clientId, async (sourceDuplex) => {
+        sourceDuplex.on('finish', () => {
+          count++;
+          expect(count).to.equal(4);
+          done();
+        })
+
+        await wait(50);
+        count++;
+        sourceDuplex.write('randomData');
+        await wait(100);
+        count++;
+        sourceDuplex.end(`${count}`, 'utf8', () => {
+          count++;
+          expect(count).to.equal(3);
+        });
+      });
+    });
   });
   describe('duplex lifecycle', function () {
     it('should be destroyed on error', async function () {
@@ -427,6 +487,47 @@ describe('Client Stream API', function () {
 
         await wait(50); // wait for target duplex to be created
         sourceDuplex.destroy();
+      });
+    });
+    it('should emit "finish" event when .end() is called and target acknowledges .end() call', function (done) {
+      const dataToTransfer = 'abc';
+
+      client2.onAddP2pStream((targetDuplex) => {
+        targetDuplex.on('data', (data) => {
+          expect(data.toString()).to.equal(dataToTransfer);
+        });
+      });
+
+      client1.addP2pStream(client2.clientId, async (sourceDuplex) => {
+        sourceDuplex.on('finish', () => {
+          // will be triggered when '.end()' is called
+          done();
+        });
+
+        await wait(50);
+        sourceDuplex.write(dataToTransfer)
+        await wait(100);
+        sourceDuplex.end();
+      });
+    });
+    it('should emit "end" event when peer stream calls .end()', function (done) {
+      let count = 0;
+
+      client2.onAddP2pStream((targetDuplex) => {
+        targetDuplex.on('end', () => {
+          // will be triggered when peer stream calls '.end()'
+          expect(count).to.equal(2);
+          done();
+        });
+      });
+
+      client1.addP2pStream(client2.clientId, async (sourceDuplex) => {
+        await wait(50);
+        count++;
+        sourceDuplex.write('randomData');
+        await wait(100);
+        count++;
+        sourceDuplex.end();
       });
     });
   });
