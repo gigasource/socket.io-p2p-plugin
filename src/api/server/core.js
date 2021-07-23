@@ -1,5 +1,5 @@
 const {
-  SOCKET_EVENT: {SERVER_ERROR, TARGET_DISCONNECT, JOIN_ROOM, LEAVE_ROOM, EMIT_ROOM, P2P_EMIT},
+  SOCKET_EVENT: {SERVER_ERROR, TARGET_DISCONNECT, JOIN_ROOM, LEAVE_ROOM, EMIT_ROOM, P2P_EMIT, LIST_CLIENTS, GET_CLIENT_CONNECTED_STATUS},
   HOOK_NAME: {POST_EMIT_TO, POST_EMIT_TO_PERSISTENT_ACK, POST_ALL_CLIENT_SOCKETS_DISCONNECTED},
 } = require('../../util/constants');
 const findKey = require('lodash/findKey');
@@ -233,6 +233,14 @@ class P2pServerCoreApi {
     socket.on(EMIT_ROOM, (roomName, event, ...args) => {
       socket.to(roomName).emit(event, ...args)
     });
+
+    socket.on(LIST_CLIENTS, (clientCallbackFn) => {
+      clientCallbackFn(Object.keys(this.clientConnectedSocketsMap));
+    });
+
+    socket.on(GET_CLIENT_CONNECTED_STATUS, (clientId, cb) => {
+      cb(this.clientConnectedSocketsMap[clientId] && this.clientConnectedSocketsMap[clientId].length > 0)
+    })
   }
 
   addTargetDisconnectListeners(socket, targetClientSocket, clientId, targetClientId) {

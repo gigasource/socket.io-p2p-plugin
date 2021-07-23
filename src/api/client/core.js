@@ -23,6 +23,34 @@ class P2pClientCoreApi {
   emitRoom(roomName, event, ...args) {
     this.socket.emit(SOCKET_EVENT.EMIT_ROOM, roomName, event, ...args);
   }
+
+  getClientList(successCallbackFn) {
+    if (successCallbackFn) {
+      this.socket.emit(SOCKET_EVENT.LIST_CLIENTS, (clientList) => {
+        successCallbackFn(clientList);
+      });
+    } else {
+      return new Promise(resolve => {
+        this.socket.emit(SOCKET_EVENT.LIST_CLIENTS, (clientList) => {
+          resolve(clientList);
+        });
+      });
+    }
+  }
+
+  isClientConnected(clientId, successCallbackFn) {
+    if (successCallbackFn) {
+      this.socket.emit(SOCKET_EVENT.GET_CLIENT_CONNECTED_STATUS, clientId, (connectedStatus) => {
+        successCallbackFn(connectedStatus)
+      })
+    } else {
+      return new Promise(resolve => {
+        this.socket.emit(SOCKET_EVENT.GET_CLIENT_CONNECTED_STATUS, clientId, (connectedStatus) => {
+          resolve(connectedStatus)
+        })
+      })
+    }
+  }
 }
 
 module.exports = P2pClientCoreApi;

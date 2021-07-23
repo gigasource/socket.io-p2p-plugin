@@ -14,6 +14,8 @@ module.exports = function p2pClientPlugin(socket, clientId, options) {
     joinRoom: p2pClientCoreApi.joinRoom.bind(p2pClientCoreApi),
     leaveRoom: p2pClientCoreApi.leaveRoom.bind(p2pClientCoreApi),
     emitRoom: p2pClientCoreApi.emitRoom.bind(p2pClientCoreApi),
+    getClientList: p2pClientCoreApi.getClientList.bind(p2pClientCoreApi),
+    isClientConnected: p2pClientCoreApi.isClientConnected.bind(p2pClientCoreApi),
 
     addP2pTarget: p2pClientMessageApi.addP2pTarget.bind(p2pClientMessageApi),
     emitTo: p2pClientMessageApi.emitTo.bind(p2pClientMessageApi),
