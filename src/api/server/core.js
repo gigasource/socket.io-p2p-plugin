@@ -270,11 +270,8 @@ class P2pServerCoreApi {
   }
 
   emitLibLog(...args) {
-    if (this.logListenerCreated) {
+    if (this.logListenerCreated)
       this.ee.emit('libLog', ...args);
-    } else {
-      if (args.length > 0) console.debug(args[0]);
-    }
   }
 
   initSocketBasedApis(socket) {
