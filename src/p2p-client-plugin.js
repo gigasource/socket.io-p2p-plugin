@@ -4,18 +4,15 @@ class NewApi {
   constructor(io, clientId) {
     this.io = io;
     this.clientId = clientId;
+    this.targetClientId = null;
 
-    this.io.on(SOCKET_EVENT.P2P_REGISTER, (sourceClientId) => {
-      if (!this.targetClientId) {
-        this.targetClientId = sourceClientId;
-        this.io.emit(SOCKET_EVENT.P2P_REGISTER_SUCCESS);
-      } else {
-        this.io.emit(SOCKET_EVENT.P2P_REGISTER_FAILED);
-      }
+    this.io.on(SOCKET_EVENT.P2P_REGISTER, sourceClientId => {
+      this.targetClientId = sourceClientId;
+      this.io.emit(SOCKET_EVENT.P2P_REGISTER_SUCCESS);
     });
 
     this.io.on(SOCKET_EVENT.P2P_DISCONNECT, () => {
-      if (this.targetClientId) delete this.targetClientId;
+      console.warn(`Target client disconnected.`)
     });
 
     this.io.on(SOCKET_EVENT.P2P_UNREGISTER, (doneCallback) => {
