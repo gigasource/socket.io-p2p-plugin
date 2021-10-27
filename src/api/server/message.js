@@ -8,7 +8,7 @@ class P2pServerMessageApi {
   createListeners(socket, clientId) {
     socket.on(ADD_TARGET, (targetClientId, callback) => {
       const targetClientSocket = this.coreApi.getSocketByClientId(targetClientId);
-      if (!targetClientSocket) return callback(`Client ${targetClientId} is not connected to server`);
+      if (!targetClientSocket) return callback(`Message: Client ${targetClientId} is not connected to server`);
 
       this.coreApi.addTargetDisconnectListeners(socket, targetClientSocket, clientId, targetClientId);
 

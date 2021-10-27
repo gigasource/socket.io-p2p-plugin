@@ -41,7 +41,7 @@ class P2pServerServiceApi {
   // Services created by server
   provideService(apiName, handlerFunction) {
     if (this.serviceApis[apiName])
-      return console.error(`Duplicated API name: ${apiName}, created service will have no effects`);
+      return console.error(`Service: Duplicated API name: ${apiName}, created service will have no effects`);
 
     this.serviceApis[apiName] = {
       fn: handlerFunction,

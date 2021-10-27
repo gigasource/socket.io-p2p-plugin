@@ -43,7 +43,7 @@ class P2pServerStreamApi {
       connectionInfo.sourceClientId = clientId;
 
       const targetClientSocket = this.coreApi.getSocketByClientId(targetClientId);
-      if (!targetClientSocket) return callback(`Client ${targetClientId} is not connected to server`);
+      if (!targetClientSocket) return callback(`Stream: Client ${targetClientId} is not connected to server`);
 
       this.coreApi.addTargetDisconnectListeners(socket, targetClientSocket, clientId, targetClientId);
 
@@ -99,7 +99,7 @@ class P2pServerStreamApi {
       return new Promise((resolve, reject) => {
         const timeout = duplexOpts.initStreamTimeout || INIT_STREAM_TIMEOUT;
         const cancelTimeout = setTimeout(() =>
-                reject(`addP2pStream error: target client response timeout (${timeout}ms) exceeded`),
+                reject(`Stream: addP2pStream error: target client response timeout (${timeout}ms) exceeded`),
             timeout);
 
         this.coreApi.emitTo(targetClientId, event, connectionInfo, err => {
@@ -117,11 +117,11 @@ class P2pServerStreamApi {
 class ServerSideDuplex extends Duplex {
   constructor(coreApi, connectionInfo, options) {
     if (options.onDisconnect && typeof options.onDisconnect !== 'function')
-      throw new Error('onDisconnect option must be function');
+      throw new Error('Stream: onDisconnect option must be function');
     if (options.onTargetDisconnect && typeof options.onTargetDisconnect !== 'function')
-      throw new Error('onTargetDisconnect option must be function');
+      throw new Error('Stream: onTargetDisconnect option must be function');
     if (options.onTargetStreamDestroyed && typeof options.onTargetStreamDestroyed !== 'function')
-      throw new Error('onTargetStreamDestroyed option must be function');
+      throw new Error('Stream: onTargetStreamDestroyed option must be function');
 
     const {ignoreStreamError, ...opts} = options
 
@@ -139,7 +139,7 @@ class ServerSideDuplex extends Duplex {
 
     // Lifecycle handlers & events
     const duplexOnError = (err) => {
-      if (err) console.error(`Error thrown by duplex stream: ${err.message}, stream will be destroyed`);
+      if (err) console.error(`Stream: Error thrown by duplex stream: ${err.message}, stream will be destroyed`);
       this.removeListener('error', duplexOnError);
       this.destroy();
       if (this.listenerCount('error') === 0) {

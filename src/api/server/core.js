@@ -80,7 +80,7 @@ class P2pServerCoreApi {
 
   // Socket-related functions
   emitError(socket, err) {
-    console.error(`Error occurred on server: from client '${this.getClientIdBySocketId(socket.id)}': ${err}`);
+    console.error(`Core: Error occurred on server: from client '${this.getClientIdBySocketId(socket.id)}': ${err}`);
     socket.emit(SERVER_ERROR, err.toString());
   }
 
@@ -91,7 +91,7 @@ class P2pServerCoreApi {
       if (this.io.kareem.hasHooks(POST_EMIT_TO)) {
         this.io.kareem.execPost(POST_EMIT_TO, null, [targetClientId, event, args], err => console.error(err));
       } else {
-        console.error((`Client ${targetClientId} is not connected to server`));
+        console.error((`Core: Client ${targetClientId} is not connected to server`));
       }
     } else {
       targetClientSocket.emit(event, ...args);
@@ -109,7 +109,7 @@ class P2pServerCoreApi {
     if (!Array.isArray(ackFnArgs)) ackFnArgs = [ackFnArgs];
 
     const messageId = await this.saveMessage(targetClientId, {usageCount: 1, event, args, ackFnName, ackFnArgs});
-    if (!messageId) throw new Error('saveMessage function must return a message ID');
+    if (!messageId) throw new Error('Core: saveMessage function must return a message ID');
 
     args.push((...targetClientCallbackArgs) => {
       this.emitLibLog(`emitToPersistent: Ack received`, {event, ackFnName, targetClientId});
@@ -151,7 +151,7 @@ class P2pServerCoreApi {
       if (!savedMessages || savedMessages.length === 0) return;
       savedMessages.forEach(({_id, usageCount, event, args, ackFnName, ackFnArgs}) => {
         if (usageCount > 1) {
-          const warning = `Warning: a message of event ${event} was sent by emitToPersistent ${usageCount} times, ` +
+          const warning = `Core: Warning: a message of event ${event} was sent by emitToPersistent ${usageCount} times, ` +
               `remember to call the ack function on receiver side to delete sent message`;
           console.warn(warning);
         }
@@ -184,7 +184,7 @@ class P2pServerCoreApi {
   checkRequiredFunctions() {
     if (typeof this.saveMessage !== 'function' || typeof this.deleteMessage !== 'function'
         || typeof this.loadMessages !== 'function' || typeof this.updateMessage !== 'function') {
-      return new Error('You must provide all 4 functions: saveMessage, deleteMessage, loadMessages, updateMessage to use emiToPersistent');
+      return new Error('Core: You must provide all 4 functions: saveMessage, deleteMessage, loadMessages, updateMessage to use emiToPersistent');
     }
   }
 
@@ -214,7 +214,7 @@ class P2pServerCoreApi {
         } else {
           if (this.virtualClients.has(targetClientId)) return;
 
-          const error = new Error(`Client ${targetClientId} is not connected to server`);
+          const error = new Error(`Core: Client ${targetClientId} is not connected to server`);
           this.emitError(socket, error);
         }
       } else {
