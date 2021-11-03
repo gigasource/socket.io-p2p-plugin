@@ -16,7 +16,7 @@ module.exports.startServer = (options) => {
   port++; // use a new server in every run (all tests in a set use the same server)
   httpServer = http.createServer((req, res) => res.end()).listen(port);
 
-  io = socketIO.listen(httpServer);
+  io = socketIO(httpServer);
 
   if (options && options.redisTest) io.adapter(redis({host: 'localhost', port: 6379}));
 

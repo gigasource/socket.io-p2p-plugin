@@ -93,7 +93,7 @@ describe('Server Core API', function () {
       });
     });
     it('should create correct number of sockets', function () {
-      expect(Object.keys(server.sockets.sockets)).to.have.length(3);
+      expect(server.sockets.sockets.size).to.be.equal(3);
     });
     it('should remove disconnected sockets', async function () {
       client1.disconnect();

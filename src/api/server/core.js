@@ -42,19 +42,18 @@ class P2pServerCoreApi {
 
   getClientMap() {
     const clientMap = {};
-    const connectedSocketMap = this.io.sockets.connected;
+    const connectedSocketMap = this.io.sockets.sockets;
 
-    Object.keys(connectedSocketMap).forEach(socketId => {
-      const socket = connectedSocketMap[socketId];
-      const {clientId, createdTime} = socket;
+    for (const [_, socket] of connectedSocketMap) {
+      const { clientId, createdTime } = socket;
 
       if (clientId) {
         const sk = clientMap[clientId];
-        if (!sk || (sk.createdTime && sk.createdTime < createdTime)) {
+        if (!sk || sk.createdTime < createdTime) {
           clientMap[clientId] = socket;
         }
       }
-    });
+    };
 
     return clientMap;
   }
